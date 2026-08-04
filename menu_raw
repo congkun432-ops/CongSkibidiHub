@@ -1,0 +1,313 @@
+-- [[ CYBERVIBE UI LIBRARY MODULE ]]
+local Library = {}
+
+function Library:CreateWindow(config)
+    config = config or {}
+    local HubName = config.HubName or "Setchauphi"
+    local AuthorName = config.AuthorName or "Courier cat"
+
+    local TweenService = game:GetService("TweenService")
+    local CoreGui = game:GetService("CoreGui") or game:GetService("Players").LocalPlayer:WaitForChild("PlayerGui")
+
+    -- ScreenGui Chứa Toàn Bộ UI
+    local ScreenGui = Instance.new("ScreenGui", CoreGui)
+    ScreenGui.Name = "CyberVibe_Hub"
+    ScreenGui.ResetOnSpawn = false
+
+    -- Mobile Toggle Button (Mini Menu)
+    local MobileToggle = Instance.new("TextButton", ScreenGui)
+    MobileToggle.Size = UDim2.new(0, 65, 0, 65)
+    MobileToggle.Position = UDim2.new(0, 15, 0, 15)
+    MobileToggle.BackgroundColor3 = Color3.fromRGB(25, 27, 34)
+    MobileToggle.Text = "" 
+    MobileToggle.Draggable = true 
+    Instance.new("UICorner", MobileToggle).CornerRadius = UDim.new(1, 0)
+    local ToggleStroke = Instance.new("UIStroke", MobileToggle); ToggleStroke.Thickness = 2
+    local ToggleIcon = Instance.new("ImageLabel", MobileToggle)
+    ToggleIcon.Size = UDim2.new(1, 0, 1, 0) 
+    ToggleIcon.BackgroundTransparency = 1
+    ToggleIcon.Image = "rbxassetid://134586557209278"
+    ToggleIcon.ImageColor3 = Color3.fromRGB(255, 255, 255)
+    ToggleIcon.ScaleType = Enum.ScaleType.Fit
+    Instance.new("UICorner", ToggleIcon).CornerRadius = UDim.new(1, 0)
+
+    -- Main Frame
+    local MainFrame = Instance.new("Frame", ScreenGui)
+    MainFrame.Size = UDim2.new(0, 460, 0, 320)
+    MainFrame.Position = UDim2.new(0.5, -230, 0.5, -160)
+    MainFrame.BackgroundColor3 = Color3.fromRGB(20, 22, 27)
+    MainFrame.Active = true
+    MainFrame.Draggable = true
+    local MainStroke = Instance.new("UIStroke", MainFrame); MainStroke.Thickness = 1.5
+    Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 10)
+
+    -- Control Buttons (X, –, D)
+    local CloseBtn = Instance.new("TextButton", MainFrame)
+    CloseBtn.Size = UDim2.new(0, 28, 0, 28); CloseBtn.Position = UDim2.new(1, -38, 0, 10)
+    CloseBtn.BackgroundColor3 = Color3.fromRGB(250, 60, 60); CloseBtn.Text = "X"; CloseBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    CloseBtn.Font = Enum.Font.GothamBold; CloseBtn.TextSize = 14
+    Instance.new("UICorner", CloseBtn).CornerRadius = UDim.new(0, 6)
+
+    local MinimizeBtn = Instance.new("TextButton", MainFrame)
+    MinimizeBtn.Size = UDim2.new(0, 28, 0, 28); MinimizeBtn.Position = UDim2.new(1, -72, 0, 10)
+    MinimizeBtn.BackgroundColor3 = Color3.fromRGB(54, 59, 72); MinimizeBtn.Text = "–"; MinimizeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    MinimizeBtn.Font = Enum.Font.GothamBold; MinimizeBtn.TextSize = 14
+    Instance.new("UICorner", MinimizeBtn).CornerRadius = UDim.new(0, 6)
+
+    local DestroyBtn = Instance.new("TextButton", MainFrame)
+    DestroyBtn.Size = UDim2.new(0, 28, 0, 28); DestroyBtn.Position = UDim2.new(1, -106, 0, 10)
+    DestroyBtn.BackgroundColor3 = Color3.fromRGB(180, 40, 40); DestroyBtn.Text = "D"; DestroyBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    DestroyBtn.Font = Enum.Font.GothamBold; DestroyBtn.TextSize = 13
+    Instance.new("UICorner", DestroyBtn).CornerRadius = UDim.new(0, 6)
+
+    CloseBtn.MouseButton1Click:Connect(function() MainFrame.Visible = false end)
+    MobileToggle.MouseButton1Click:Connect(function() MainFrame.Visible = not MainFrame.Visible end)
+
+    -- Thu nhỏ Menu
+    local isMinimized = false
+    local originalSize = MainFrame.Size
+    local originalClips = MainFrame.ClipsDescendants
+
+    MinimizeBtn.MouseButton1Click:Connect(function()
+        isMinimized = not isMinimized
+        MainFrame.ClipsDescendants = true 
+        if isMinimized then
+            TweenService:Create(MainFrame, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+                Size = UDim2.new(originalSize.X.Scale, originalSize.X.Offset, 0, 38)
+            }):Play()
+            MinimizeBtn.Text = "+" 
+        else
+            local tween = TweenService:Create(MainFrame, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = originalSize})
+            tween:Play()
+            MinimizeBtn.Text = "–"
+            tween.Completed:Connect(function()
+                if not isMinimized then MainFrame.ClipsDescendants = originalClips end
+            end)
+        end
+    end)
+
+    -- Destroy Menu (Xóa Sạch Menu Chính + Mini Menu)
+    DestroyBtn.MouseButton1Click:Connect(function()
+        local ConfirmFrame = Instance.new("Frame", ScreenGui)
+        ConfirmFrame.Size = UDim2.new(0, 260, 0, 130); ConfirmFrame.Position = UDim2.new(0.5, -130, 0.5, -65)
+        ConfirmFrame.BackgroundColor3 = Color3.fromRGB(33, 36, 43)
+        Instance.new("UICorner", ConfirmFrame).CornerRadius = UDim.new(0, 8)
+        local ConfirmStroke = Instance.new("UIStroke", ConfirmFrame); ConfirmStroke.Color = Color3.fromRGB(54, 59, 72)
+        
+        local TextLabel = Instance.new("TextLabel", ConfirmFrame)
+        TextLabel.Size = UDim2.new(1, 0, 0.5, 0); TextLabel.BackgroundTransparency = 1
+        TextLabel.Text = "Bạn có chắc chắn muốn\nXÓA HOÀN TOÀN menu không?"; TextLabel.TextColor3 = Color3.fromRGB(230, 230, 230)
+        TextLabel.Font = Enum.Font.GothamMedium; TextLabel.TextSize = 13
+
+        local YesBtn = Instance.new("TextButton", ConfirmFrame)
+        YesBtn.Size = UDim2.new(0, 100, 0, 32); YesBtn.Position = UDim2.new(0.12, 0, 0.6, 5)
+        YesBtn.BackgroundColor3 = Color3.fromRGB(250, 60, 60); YesBtn.Text = "Xác Nhận"; YesBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+        YesBtn.Font = Enum.Font.GothamBold; Instance.new("UICorner", YesBtn).CornerRadius = UDim.new(0, 6)
+        
+        local NoBtn = Instance.new("TextButton", ConfirmFrame)
+        NoBtn.Size = UDim2.new(0, 100, 0, 32); NoBtn.Position = UDim2.new(0.56, 0, 0.6, 5)
+        NoBtn.BackgroundColor3 = Color3.fromRGB(50, 53, 65); NoBtn.Text = "Hủy Bỏ"; NoBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
+        NoBtn.Font = Enum.Font.GothamBold; Instance.new("UICorner", NoBtn).CornerRadius = UDim.new(0, 6)
+
+        NoBtn.MouseButton1Click:Connect(function() ConfirmFrame:Destroy() end)
+        YesBtn.MouseButton1Click:Connect(function()
+            ScreenGui:Destroy() -- Xóa gốc ScreenGui (MainFrame, Mini Menu Toggle đều sẽ biến mất hoàn toàn)
+        end)
+    end)
+
+    -- Header Title
+    local TitleLabel = Instance.new("TextLabel", MainFrame)
+    TitleLabel.Size = UDim2.new(1, -50, 0, 40); TitleLabel.Position = UDim2.new(0, 15, 0, 0); TitleLabel.BackgroundTransparency = 1
+    TitleLabel.Font = Enum.Font.GothamBold; TitleLabel.TextSize = 14; TitleLabel.TextXAlignment = 0
+
+    task.spawn(function()
+        while ScreenGui and ScreenGui.Parent do
+            local hue = (tick() % 6) / 6
+            local rainbow = Color3.fromHSV(hue, 0.7, 1)
+            MainStroke.Color = rainbow
+            TitleLabel.TextColor3 = rainbow
+            ToggleStroke.Color = rainbow
+            TitleLabel.Text = "🔮  " .. HubName .. "  |  By: " .. AuthorName
+            task.wait(0.03)
+        end
+    end)
+
+    -- Containers
+    local TabContainer = Instance.new("Frame", MainFrame)
+    TabContainer.Size = UDim2.new(0, 110, 1, -55); TabContainer.Position = UDim2.new(0, 12, 0, 45); TabContainer.BackgroundTransparency = 1
+    local TabList = Instance.new("UIListLayout", TabContainer); TabList.Padding = UDim.new(0, 6)
+
+    local ContentContainer = Instance.new("Frame", MainFrame)
+    ContentContainer.Size = UDim2.new(1, -145, 1, -55); ContentContainer.Position = UDim2.new(0, 133, 0, 45); ContentContainer.BackgroundTransparency = 1
+
+    local Window = { Pages = {}, TabButtons = {} }
+
+    function Window:CreateTab(name)
+        local Page = Instance.new("ScrollingFrame", ContentContainer)
+        Page.Name = name .. "Page"; Page.Size = UDim2.new(1, 0, 1, 0); Page.BackgroundTransparency = 1; Page.Visible = false
+        Page.ScrollBarThickness = 3; Page.ScrollBarImageColor3 = Color3.fromRGB(80, 85, 100); Page.CanvasSize = UDim2.new(0, 0, 0, 0)
+        
+        local PageList = Instance.new("UIListLayout", Page); PageList.Padding = UDim.new(0, 6)
+        PageList:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+            Page.CanvasSize = UDim2.new(0, 0, 0, PageList.AbsoluteContentSize.Y + 10)
+        end)
+
+        local TabBtn = Instance.new("TextButton", TabContainer)
+        TabBtn.Size = UDim2.new(1, 0, 0, 34); TabBtn.Text = "  " .. name; TabBtn.BackgroundColor3 = Color3.fromRGB(28, 31, 38)
+        TabBtn.TextColor3 = Color3.fromRGB(150, 155, 165); TabBtn.Font = Enum.Font.GothamBold; TabBtn.TextSize = 11; TabBtn.TextXAlignment = 0
+        Instance.new("UICorner", TabBtn).CornerRadius = UDim.new(0, 6)
+        local BtnStroke = Instance.new("UIStroke", TabBtn); BtnStroke.Color = Color3.fromRGB(40, 44, 54); BtnStroke.Thickness = 1
+
+        TabBtn.MouseButton1Click:Connect(function()
+            for _, p in pairs(Window.Pages) do p.Visible = false end
+            for _, btn in pairs(Window.TabButtons) do
+                TweenService:Create(btn, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(28, 31, 38), TextColor3 = Color3.fromRGB(150, 155, 165)}):Play()
+            end
+            Page.Visible = true
+            TweenService:Create(TabBtn, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(35, 40, 50), TextColor3 = Color3.fromRGB(0, 212, 255)}):Play()
+        end)
+
+        if #Window.TabButtons == 0 then
+            Page.Visible = true
+            TabBtn.BackgroundColor3 = Color3.fromRGB(35, 40, 50)
+            TabBtn.TextColor3 = Color3.fromRGB(0, 212, 255)
+        end
+
+        table.insert(Window.Pages, Page)
+        table.insert(Window.TabButtons, TabBtn)
+
+        local Tab = {}
+
+        -- Add Switch
+        function Tab:AddSwitch(labelText, default, callback)
+            local SwitchFrame = Instance.new("Frame", Page)
+            SwitchFrame.Size = UDim2.new(1, 0, 0, 38); SwitchFrame.BackgroundTransparency = 1
+            
+            local Label = Instance.new("TextLabel", SwitchFrame)
+            Label.Size = UDim2.new(0.6, 0, 1, 0); Label.Text = labelText; Label.TextColor3 = Color3.fromRGB(230, 230, 230)
+            Label.Font = Enum.Font.GothamMedium; Label.TextSize = 13; Label.BackgroundTransparency = 1; Label.TextXAlignment = 0
+            
+            local BG = Instance.new("Frame", SwitchFrame)
+            BG.Size = UDim2.new(0, 38, 0, 20); BG.Position = UDim2.new(1, -45, 0.5, -10)
+            BG.BackgroundColor3 = default and Color3.fromRGB(0, 168, 204) or Color3.fromRGB(45, 48, 56)
+            Instance.new("UICorner", BG).CornerRadius = UDim.new(1, 0)
+            
+            local Ball = Instance.new("Frame", BG)
+            Ball.Size = UDim2.new(0, 14, 0, 14); Ball.Position = default and UDim2.new(1, -18, 0.5, -7) or UDim2.new(0, 3, 0.5, -7)
+            Ball.BackgroundColor3 = Color3.fromRGB(255, 255, 255); Instance.new("UICorner", Ball).CornerRadius = UDim.new(1, 0)
+            
+            local ClickBtn = Instance.new("TextButton", SwitchFrame)
+            ClickBtn.Size = UDim2.new(1, 0, 1, 0); ClickBtn.BackgroundTransparency = 1; ClickBtn.Text = ""
+            
+            local state = default or false
+            ClickBtn.MouseButton1Click:Connect(function()
+                state = not state
+                TweenService:Create(Ball, TweenInfo.new(0.2, Enum.EasingStyle.Quad), {Position = state and UDim2.new(1, -18, 0.5, -7) or UDim2.new(0, 3, 0.5, -7)}):Play()
+                TweenService:Create(BG, TweenInfo.new(0.2, Enum.EasingStyle.Quad), {BackgroundColor3 = state and Color3.fromRGB(0, 168, 204) or Color3.fromRGB(45, 48, 56)}):Play()
+                callback(state)
+            end)
+        end
+
+        -- Add TextBox
+        function Tab:AddTextBox(labelText, placeholder, callback)
+            local BoxFrame = Instance.new("Frame", Page)
+            BoxFrame.Size = UDim2.new(1, 0, 0, 38); BoxFrame.BackgroundTransparency = 1
+            
+            local Label = Instance.new("TextLabel", BoxFrame)
+            Label.Size = UDim2.new(0.5, 0, 1, 0); Label.Text = labelText; Label.TextColor3 = Color3.fromRGB(230, 230, 230)
+            Label.Font = Enum.Font.GothamMedium; Label.TextSize = 13; Label.BackgroundTransparency = 1; Label.TextXAlignment = 0
+            
+            local Input = Instance.new("TextBox", BoxFrame)
+            Input.Size = UDim2.new(0, 65, 0, 26); Input.Position = UDim2.new(1, -70, 0.5, -13)
+            Input.BackgroundColor3 = Color3.fromRGB(33, 36, 43); Input.TextColor3 = Color3.fromRGB(0, 212, 255)
+            Input.Text = placeholder or ""; Input.TextSize = 12; Input.Font = Enum.Font.GothamBold; Input.ClearTextOnFocus = true
+            Instance.new("UICorner", Input).CornerRadius = UDim.new(0, 6)
+            local BoxStroke = Instance.new("UIStroke", Input); BoxStroke.Color = Color3.fromRGB(54, 59, 72); BoxStroke.Thickness = 1
+            
+            Input.FocusLost:Connect(function() callback(Input.Text) end)
+        end
+
+        -- Add Button
+        function Tab:AddButton(labelText, buttonText, callback)
+            local ButtonFrame = Instance.new("Frame", Page)
+            ButtonFrame.Size = UDim2.new(1, 0, 0, 38); ButtonFrame.BackgroundTransparency = 1
+            
+            local Label = Instance.new("TextLabel", ButtonFrame)
+            Label.Size = UDim2.new(0.5, 0, 1, 0); Label.Text = labelText; Label.TextColor3 = Color3.fromRGB(230, 230, 230)
+            Label.Font = Enum.Font.GothamMedium; Label.TextSize = 13; Label.BackgroundTransparency = 1; Label.TextXAlignment = 0
+            
+            local ActionBtn = Instance.new("TextButton", ButtonFrame)
+            ActionBtn.Size = UDim2.new(0, 100, 0, 28); ActionBtn.Position = UDim2.new(1, -105, 0.5, -14)
+            ActionBtn.BackgroundColor3 = Color3.fromRGB(33, 36, 43); ActionBtn.TextColor3 = Color3.fromRGB(0, 212, 255)
+            ActionBtn.Text = buttonText or "Click"; ActionBtn.TextSize = 12; ActionBtn.Font = Enum.Font.GothamBold
+            Instance.new("UICorner", ActionBtn).CornerRadius = UDim.new(0, 6)
+            local BtnStroke = Instance.new("UIStroke", ActionBtn); BtnStroke.Color = Color3.fromRGB(54, 59, 72); BtnStroke.Thickness = 1
+
+            ActionBtn.MouseButton1Click:Connect(function()
+                TweenService:Create(ActionBtn, TweenInfo.new(0.08), {BackgroundColor3 = Color3.fromRGB(0, 168, 204), TextColor3 = Color3.fromRGB(255, 255, 255)}):Play()
+                task.wait(0.08)
+                TweenService:Create(ActionBtn, TweenInfo.new(0.1), {BackgroundColor3 = Color3.fromRGB(33, 36, 43), TextColor3 = Color3.fromRGB(0, 212, 255)}):Play()
+                callback()
+            end)
+        end
+
+        -- Add Dropdown
+        function Tab:AddDropdown(labelText, options, callback)
+            local DropdownFrame = Instance.new("Frame", Page)
+            DropdownFrame.Size = UDim2.new(1, 0, 0, 38); DropdownFrame.BackgroundTransparency = 1; DropdownFrame.ClipsDescendants = false 
+            
+            local Label = Instance.new("TextLabel", DropdownFrame)
+            Label.Size = UDim2.new(0.4, 0, 1, 0); Label.Text = labelText; Label.TextColor3 = Color3.fromRGB(230, 230, 230)
+            Label.Font = Enum.Font.GothamMedium; Label.TextSize = 13; Label.BackgroundTransparency = 1; Label.TextXAlignment = 0
+            
+            local MainBtn = Instance.new("TextButton", DropdownFrame)
+            MainBtn.Size = UDim2.new(0, 130, 0, 28); MainBtn.Position = UDim2.new(1, -135, 0.5, -14)
+            MainBtn.BackgroundColor3 = Color3.fromRGB(33, 36, 43); MainBtn.TextColor3 = Color3.fromRGB(0, 212, 255)
+            MainBtn.Text = options[1] or "None"; MainBtn.Font = Enum.Font.GothamBold; MainBtn.TextSize = 12
+            Instance.new("UICorner", MainBtn).CornerRadius = UDim.new(0, 6)
+            local DropStroke = Instance.new("UIStroke", MainBtn); DropStroke.Color = Color3.fromRGB(54, 59, 72); DropStroke.Thickness = 1
+
+            local ScrollList = Instance.new("ScrollingFrame", MainBtn)
+            ScrollList.Size = UDim2.new(1, 0, 0, 100); ScrollList.Position = UDim2.new(0, 0, 1, 5)
+            ScrollList.BackgroundColor3 = Color3.fromRGB(25, 27, 34); ScrollList.Visible = false; ScrollList.ZIndex = 10
+            ScrollList.ScrollBarThickness = 3; ScrollList.CanvasSize = UDim2.new(0, 0, 0, 0)
+            Instance.new("UICorner", ScrollList).CornerRadius = UDim.new(0, 6)
+            local ListStroke = Instance.new("UIStroke", ScrollList); ListStroke.Color = Color3.fromRGB(0, 212, 255); ListStroke.Thickness = 1
+
+            local ListLayout = Instance.new("UIListLayout", ScrollList); ListLayout.Padding = UDim.new(0, 2)
+            ListLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+                ScrollList.CanvasSize = UDim2.new(0, 0, 0, ListLayout.AbsoluteContentSize.Y + 5)
+            end)
+
+            local isOpen = false
+            MainBtn.MouseButton1Click:Connect(function()
+                isOpen = not isOpen
+                ScrollList.Visible = isOpen
+            end)
+
+            for _, optionName in pairs(options) do
+                local OptBtn = Instance.new("TextButton", ScrollList)
+                OptBtn.Size = UDim2.new(1, 0, 0, 25); OptBtn.BackgroundTransparency = 1
+                OptBtn.Text = optionName; OptBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
+                OptBtn.Font = Enum.Font.GothamMedium; OptBtn.TextSize = 11; OptBtn.ZIndex = 11
+                
+                OptBtn.MouseButton1Click:Connect(function()
+                    MainBtn.Text = optionName
+                    isOpen = false
+                    ScrollList.Visible = false
+                    callback(optionName)
+                end)
+            end
+        end
+
+        function Tab:GetPageContainer()
+            return Page
+        end
+
+        return Tab
+    end
+
+    return Window
+end
+
+return Library
