@@ -14,27 +14,28 @@ function Library:CreateWindow(config)
     ScreenGui.Name = "CyberVibe_Hub"
     ScreenGui.ResetOnSpawn = false
 
-    -- Mobile Toggle Button (Icon menu nhỏ)
-    local MobileToggle = Instance.new("ImageButton", ScreenGui)
-    MobileToggle.Size = UDim2.new(0, 60, 0, 60)
+    -- Mobile Toggle Button (Icon menu nhỏ - giữ nguyên từ code cũ)
+    local MobileToggle = Instance.new("TextButton", ScreenGui)
+    MobileToggle.Size = UDim2.new(0, 65, 0, 65)
     MobileToggle.Position = UDim2.new(0, 15, 0, 15)
     MobileToggle.BackgroundColor3 = Color3.fromRGB(25, 27, 34)
-    MobileToggle.BackgroundTransparency = 0
-    MobileToggle.Image = "rbxassetid://134586557209278"
-    MobileToggle.ImageColor3 = Color3.fromRGB(255, 255, 255)
-    MobileToggle.ImageRectOffset = Vector2.new(0, 0)
-    MobileToggle.ImageRectSize = Vector2.new(0, 0)
-    MobileToggle.ScaleType = Enum.ScaleType.Fit
-    MobileToggle.Draggable = true
+    MobileToggle.Text = "" 
+    MobileToggle.Draggable = true 
     MobileToggle.Visible = true
     MobileToggle.ZIndex = 10
-    MobileToggle.AutoButtonColor = false
     Instance.new("UICorner", MobileToggle).CornerRadius = UDim.new(1, 0)
-    
-    -- Stroke cho icon
     local ToggleStroke = Instance.new("UIStroke", MobileToggle)
     ToggleStroke.Thickness = 2
     ToggleStroke.Color = Color3.fromRGB(0, 212, 255)
+    
+    local ToggleIcon = Instance.new("ImageLabel", MobileToggle)
+    ToggleIcon.Size = UDim2.new(1, 0, 1, 0) 
+    ToggleIcon.Position = UDim2.new(0, 0, 0, 0)
+    ToggleIcon.BackgroundTransparency = 1
+    ToggleIcon.Image = "rbxassetid://134586557209278"
+    ToggleIcon.ImageColor3 = Color3.fromRGB(255, 255, 255)
+    ToggleIcon.ScaleType = Enum.ScaleType.Fit
+    Instance.new("UICorner", ToggleIcon).CornerRadius = UDim.new(1, 0)
 
     -- Main Frame
     local MainFrame = Instance.new("Frame", ScreenGui)
@@ -138,7 +139,6 @@ function Library:CreateWindow(config)
         MainFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
         MainFrame.BackgroundTransparency = 1
         
-        -- Animation mở menu
         TweenService:Create(MainFrame, TweenInfo.new(0.5, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
             Size = FULL_SIZE,
             Position = UDim2.new(0.5, -230, 0.5, -160)
@@ -147,7 +147,6 @@ function Library:CreateWindow(config)
             BackgroundTransparency = 0
         }):Play()
         
-        -- Reset trạng thái thu nhỏ
         if isMinimized then
             isMinimized = false
             MinimizeBtn.Text = "–"
@@ -171,7 +170,6 @@ function Library:CreateWindow(config)
         MainFrame.Position = UDim2.new(0.5, -230, 0.5, -160)
         MainFrame.ClipsDescendants = true
         
-        -- Reset trạng thái thu nhỏ khi đóng
         if isMinimized then
             isMinimized = false
             MinimizeBtn.Text = "–"
@@ -189,7 +187,7 @@ function Library:CreateWindow(config)
         end
     end)
 
-    -- Close Button - Đóng và reset trạng thái
+    -- Close Button
     CloseBtn.MouseButton1Click:Connect(function()
         CloseMenu()
     end)
@@ -201,7 +199,6 @@ function Library:CreateWindow(config)
         isMinimized = not isMinimized
         
         if isMinimized then
-            -- Thu nhỏ
             MainFrame.ClipsDescendants = true
             TweenService:Create(MainFrame, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
                 Size = MINI_SIZE
@@ -210,7 +207,6 @@ function Library:CreateWindow(config)
             TabContainer.Visible = false
             ContentContainer.Visible = false
         else
-            -- Mở rộng
             TweenService:Create(MainFrame, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
                 Size = FULL_SIZE
             }):Play()
