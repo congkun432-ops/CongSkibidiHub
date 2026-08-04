@@ -21,6 +21,7 @@ function Library:CreateWindow(config)
     MobileToggle.BackgroundColor3 = Color3.fromRGB(25, 27, 34)
     MobileToggle.Text = "" 
     MobileToggle.Draggable = true 
+    MobileToggle.Visible = true
     Instance.new("UICorner", MobileToggle).CornerRadius = UDim.new(1, 0)
     local ToggleStroke = Instance.new("UIStroke", MobileToggle); ToggleStroke.Thickness = 2
     local ToggleIcon = Instance.new("ImageLabel", MobileToggle)
@@ -38,6 +39,10 @@ function Library:CreateWindow(config)
     MainFrame.BackgroundColor3 = Color3.fromRGB(20, 22, 27)
     MainFrame.Active = true
     MainFrame.Draggable = true
+    MainFrame.Visible = false -- Ẩn ban đầu
+    MainFrame.BackgroundTransparency = 1 -- Trong suốt ban đầu
+    MainFrame.Size = UDim2.new(0, 0, 0, 0) -- Kích thước 0 ban đầu
+    
     local MainStroke = Instance.new("UIStroke", MainFrame); MainStroke.Thickness = 1.5
     Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 10)
 
@@ -59,61 +64,6 @@ function Library:CreateWindow(config)
     DestroyBtn.BackgroundColor3 = Color3.fromRGB(180, 40, 40); DestroyBtn.Text = "D"; DestroyBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
     DestroyBtn.Font = Enum.Font.GothamBold; DestroyBtn.TextSize = 13
     Instance.new("UICorner", DestroyBtn).CornerRadius = UDim.new(0, 6)
-
-    CloseBtn.MouseButton1Click:Connect(function() MainFrame.Visible = false end)
-    MobileToggle.MouseButton1Click:Connect(function() MainFrame.Visible = not MainFrame.Visible end)
-
-    -- Thu nhỏ Menu
-    local isMinimized = false
-    local originalSize = MainFrame.Size
-    local originalClips = MainFrame.ClipsDescendants
-
-    MinimizeBtn.MouseButton1Click:Connect(function()
-        isMinimized = not isMinimized
-        MainFrame.ClipsDescendants = true 
-        if isMinimized then
-            TweenService:Create(MainFrame, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-                Size = UDim2.new(originalSize.X.Scale, originalSize.X.Offset, 0, 38)
-            }):Play()
-            MinimizeBtn.Text = "+" 
-        else
-            local tween = TweenService:Create(MainFrame, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = originalSize})
-            tween:Play()
-            MinimizeBtn.Text = "–"
-            tween.Completed:Connect(function()
-                if not isMinimized then MainFrame.ClipsDescendants = originalClips end
-            end)
-        end
-    end)
-
-    -- Destroy Menu (Xóa Sạch Menu Chính + Mini Menu)
-    DestroyBtn.MouseButton1Click:Connect(function()
-        local ConfirmFrame = Instance.new("Frame", ScreenGui)
-        ConfirmFrame.Size = UDim2.new(0, 260, 0, 130); ConfirmFrame.Position = UDim2.new(0.5, -130, 0.5, -65)
-        ConfirmFrame.BackgroundColor3 = Color3.fromRGB(33, 36, 43)
-        Instance.new("UICorner", ConfirmFrame).CornerRadius = UDim.new(0, 8)
-        local ConfirmStroke = Instance.new("UIStroke", ConfirmFrame); ConfirmStroke.Color = Color3.fromRGB(54, 59, 72)
-        
-        local TextLabel = Instance.new("TextLabel", ConfirmFrame)
-        TextLabel.Size = UDim2.new(1, 0, 0.5, 0); TextLabel.BackgroundTransparency = 1
-        TextLabel.Text = "Bạn có chắc chắn muốn\nXÓA HOÀN TOÀN menu không?"; TextLabel.TextColor3 = Color3.fromRGB(230, 230, 230)
-        TextLabel.Font = Enum.Font.GothamMedium; TextLabel.TextSize = 13
-
-        local YesBtn = Instance.new("TextButton", ConfirmFrame)
-        YesBtn.Size = UDim2.new(0, 100, 0, 32); YesBtn.Position = UDim2.new(0.12, 0, 0.6, 5)
-        YesBtn.BackgroundColor3 = Color3.fromRGB(250, 60, 60); YesBtn.Text = "Xác Nhận"; YesBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-        YesBtn.Font = Enum.Font.GothamBold; Instance.new("UICorner", YesBtn).CornerRadius = UDim.new(0, 6)
-        
-        local NoBtn = Instance.new("TextButton", ConfirmFrame)
-        NoBtn.Size = UDim2.new(0, 100, 0, 32); NoBtn.Position = UDim2.new(0.56, 0, 0.6, 5)
-        NoBtn.BackgroundColor3 = Color3.fromRGB(50, 53, 65); NoBtn.Text = "Hủy Bỏ"; NoBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
-        NoBtn.Font = Enum.Font.GothamBold; Instance.new("UICorner", NoBtn).CornerRadius = UDim.new(0, 6)
-
-        NoBtn.MouseButton1Click:Connect(function() ConfirmFrame:Destroy() end)
-        YesBtn.MouseButton1Click:Connect(function()
-            ScreenGui:Destroy() -- Xóa gốc ScreenGui (MainFrame, Mini Menu Toggle đều sẽ biến mất hoàn toàn)
-        end)
-    end)
 
     -- Header Title
     local TitleLabel = Instance.new("TextLabel", MainFrame)
@@ -139,6 +89,102 @@ function Library:CreateWindow(config)
 
     local ContentContainer = Instance.new("Frame", MainFrame)
     ContentContainer.Size = UDim2.new(1, -145, 1, -55); ContentContainer.Position = UDim2.new(0, 133, 0, 45); ContentContainer.BackgroundTransparency = 1
+
+    -- Hiệu ứng mở menu
+    local function OpenMenu()
+        MainFrame.Visible = true
+        TweenService:Create(MainFrame, TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+            Size = UDim2.new(0, 460, 0, 320),
+            BackgroundTransparency = 0,
+            Position = UDim2.new(0.5, -230, 0.5, -160)
+        }):Play()
+        TweenService:Create(MainFrame, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+            BackgroundTransparency = 0
+        }):Play()
+    end
+
+    -- Hiệu ứng đóng menu
+    local function CloseMenu()
+        TweenService:Create(MainFrame, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.In), {
+            Size = UDim2.new(0, 0, 0, 0),
+            BackgroundTransparency = 1,
+            Position = UDim2.new(0.5, 0, 0.5, 0)
+        }):Play()
+        task.wait(0.3)
+        MainFrame.Visible = false
+        MainFrame.Size = UDim2.new(0, 460, 0, 320)
+        MainFrame.Position = UDim2.new(0.5, -230, 0.5, -160)
+    end
+
+    -- Mobile Toggle - Mở menu với hiệu ứng
+    MobileToggle.MouseButton1Click:Connect(function()
+        if MainFrame.Visible then
+            CloseMenu()
+        else
+            OpenMenu()
+        end
+    end)
+
+    -- Close Button - Đóng với hiệu ứng
+    CloseBtn.MouseButton1Click:Connect(function()
+        CloseMenu()
+    end)
+
+    -- Thu nhỏ Menu (giữ nguyên)
+    local isMinimized = false
+    local originalSize = MainFrame.Size
+    local originalClips = MainFrame.ClipsDescendants
+
+    MinimizeBtn.MouseButton1Click:Connect(function()
+        isMinimized = not isMinimized
+        MainFrame.ClipsDescendants = true 
+        if isMinimized then
+            TweenService:Create(MainFrame, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+                Size = UDim2.new(originalSize.X.Scale, originalSize.X.Offset, 0, 38)
+            }):Play()
+            MinimizeBtn.Text = "+" 
+        else
+            local tween = TweenService:Create(MainFrame, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = originalSize})
+            tween:Play()
+            MinimizeBtn.Text = "–"
+            tween.Completed:Connect(function()
+                if not isMinimized then MainFrame.ClipsDescendants = originalClips end
+            end)
+        end
+    end)
+
+    -- Destroy Menu (giữ nguyên)
+    DestroyBtn.MouseButton1Click:Connect(function()
+        local ConfirmFrame = Instance.new("Frame", ScreenGui)
+        ConfirmFrame.Size = UDim2.new(0, 260, 0, 130); ConfirmFrame.Position = UDim2.new(0.5, -130, 0.5, -65)
+        ConfirmFrame.BackgroundColor3 = Color3.fromRGB(33, 36, 43)
+        Instance.new("UICorner", ConfirmFrame).CornerRadius = UDim.new(0, 8)
+        local ConfirmStroke = Instance.new("UIStroke", ConfirmFrame); ConfirmStroke.Color = Color3.fromRGB(54, 59, 72)
+        
+        local TextLabel = Instance.new("TextLabel", ConfirmFrame)
+        TextLabel.Size = UDim2.new(1, 0, 0.5, 0); TextLabel.BackgroundTransparency = 1
+        TextLabel.Text = "Bạn có chắc chắn muốn\nXÓA HOÀN TOÀN menu không?"; TextLabel.TextColor3 = Color3.fromRGB(230, 230, 230)
+        TextLabel.Font = Enum.Font.GothamMedium; TextLabel.TextSize = 13
+
+        local YesBtn = Instance.new("TextButton", ConfirmFrame)
+        YesBtn.Size = UDim2.new(0, 100, 0, 32); YesBtn.Position = UDim2.new(0.12, 0, 0.6, 5)
+        YesBtn.BackgroundColor3 = Color3.fromRGB(250, 60, 60); YesBtn.Text = "Xác Nhận"; YesBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+        YesBtn.Font = Enum.Font.GothamBold; Instance.new("UICorner", YesBtn).CornerRadius = UDim.new(0, 6)
+        
+        local NoBtn = Instance.new("TextButton", ConfirmFrame)
+        NoBtn.Size = UDim2.new(0, 100, 0, 32); NoBtn.Position = UDim2.new(0.56, 0, 0.6, 5)
+        NoBtn.BackgroundColor3 = Color3.fromRGB(50, 53, 65); NoBtn.Text = "Hủy Bỏ"; NoBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
+        NoBtn.Font = Enum.Font.GothamBold; Instance.new("UICorner", NoBtn).CornerRadius = UDim.new(0, 6)
+
+        NoBtn.MouseButton1Click:Connect(function() ConfirmFrame:Destroy() end)
+        YesBtn.MouseButton1Click:Connect(function()
+            ScreenGui:Destroy()
+        end)
+    end)
+
+    -- Mở menu tự động khi load với hiệu ứng
+    task.wait(0.1)
+    OpenMenu()
 
     local Window = { Pages = {}, TabButtons = {} }
 
@@ -178,7 +224,7 @@ function Library:CreateWindow(config)
 
         local Tab = {}
 
-        -- Add Switch
+        -- Add Switch (giữ nguyên)
         function Tab:AddSwitch(labelText, default, callback)
             local SwitchFrame = Instance.new("Frame", Page)
             SwitchFrame.Size = UDim2.new(1, 0, 0, 38); SwitchFrame.BackgroundTransparency = 1
@@ -208,7 +254,7 @@ function Library:CreateWindow(config)
             end)
         end
 
-        -- Add TextBox
+        -- Add TextBox (giữ nguyên)
         function Tab:AddTextBox(labelText, placeholder, callback)
             local BoxFrame = Instance.new("Frame", Page)
             BoxFrame.Size = UDim2.new(1, 0, 0, 38); BoxFrame.BackgroundTransparency = 1
@@ -227,7 +273,7 @@ function Library:CreateWindow(config)
             Input.FocusLost:Connect(function() callback(Input.Text) end)
         end
 
-        -- Add Button
+        -- Add Button (giữ nguyên)
         function Tab:AddButton(labelText, buttonText, callback)
             local ButtonFrame = Instance.new("Frame", Page)
             ButtonFrame.Size = UDim2.new(1, 0, 0, 38); ButtonFrame.BackgroundTransparency = 1
@@ -251,7 +297,7 @@ function Library:CreateWindow(config)
             end)
         end
 
-        -- Add Dropdown
+        -- Add Dropdown (giữ nguyên)
         function Tab:AddDropdown(labelText, options, callback)
             local DropdownFrame = Instance.new("Frame", Page)
             DropdownFrame.Size = UDim2.new(1, 0, 0, 38); DropdownFrame.BackgroundTransparency = 1; DropdownFrame.ClipsDescendants = false 
