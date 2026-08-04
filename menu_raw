@@ -14,27 +14,27 @@ function Library:CreateWindow(config)
     ScreenGui.Name = "CyberVibe_Hub"
     ScreenGui.ResetOnSpawn = false
 
-    -- Mobile Toggle Button (Icon menu nhỏ - giữ nguyên từ code cũ)
+    -- Mobile Toggle Button (Mini Menu)
     local MobileToggle = Instance.new("TextButton", ScreenGui)
     MobileToggle.Size = UDim2.new(0, 65, 0, 65)
     MobileToggle.Position = UDim2.new(0, 15, 0, 15)
     MobileToggle.BackgroundColor3 = Color3.fromRGB(25, 27, 34)
     MobileToggle.Text = "" 
     MobileToggle.Draggable = true 
-    MobileToggle.Visible = true
+    MobileToggle.Visible = false -- Ẩn đi chờ Intro chạy xong mới hiện
     MobileToggle.ZIndex = 10
     Instance.new("UICorner", MobileToggle).CornerRadius = UDim.new(1, 0)
-    local ToggleStroke = Instance.new("UIStroke", MobileToggle)
-    ToggleStroke.Thickness = 2
-    ToggleStroke.Color = Color3.fromRGB(0, 212, 255)
     
+    local ToggleStroke = Instance.new("UIStroke", MobileToggle); ToggleStroke.Thickness = 2
     local ToggleIcon = Instance.new("ImageLabel", MobileToggle)
     ToggleIcon.Size = UDim2.new(1, 0, 1, 0) 
-    ToggleIcon.Position = UDim2.new(0, 0, 0, 0)
     ToggleIcon.BackgroundTransparency = 1
-    ToggleIcon.Image = "rbxassetid://134586557209278"
+    
+    -- Đã đổi sang rbxthumb để tự động ép kiểu hình ảnh, fix lỗi chỉ hiện cục đen
+    ToggleIcon.Image = "rbxthumb://type=Asset&id=134586557209278&w=150&h=150"
     ToggleIcon.ImageColor3 = Color3.fromRGB(255, 255, 255)
     ToggleIcon.ScaleType = Enum.ScaleType.Fit
+    ToggleIcon.ZIndex = 11 -- Ép icon nổi lên trên
     Instance.new("UICorner", ToggleIcon).CornerRadius = UDim.new(1, 0)
 
     -- Main Frame
@@ -49,56 +49,33 @@ function Library:CreateWindow(config)
     MainFrame.Visible = false
     MainFrame.BackgroundTransparency = 1
     MainFrame.ClipsDescendants = true
-    MainFrame.ZIndex = 1
     
-    local MainStroke = Instance.new("UIStroke", MainFrame)
-    MainStroke.Thickness = 1.5
-    MainStroke.Color = Color3.fromRGB(0, 212, 255)
+    local MainStroke = Instance.new("UIStroke", MainFrame); MainStroke.Thickness = 1.5
     Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 10)
 
     -- Control Buttons (X, –, D)
     local CloseBtn = Instance.new("TextButton", MainFrame)
-    CloseBtn.Size = UDim2.new(0, 28, 0, 28)
-    CloseBtn.Position = UDim2.new(1, -38, 0, 10)
-    CloseBtn.BackgroundColor3 = Color3.fromRGB(250, 60, 60)
-    CloseBtn.Text = "X"
-    CloseBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    CloseBtn.Font = Enum.Font.GothamBold
-    CloseBtn.TextSize = 14
-    CloseBtn.ZIndex = 2
+    CloseBtn.Size = UDim2.new(0, 28, 0, 28); CloseBtn.Position = UDim2.new(1, -38, 0, 10)
+    CloseBtn.BackgroundColor3 = Color3.fromRGB(250, 60, 60); CloseBtn.Text = "X"; CloseBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    CloseBtn.Font = Enum.Font.GothamBold; CloseBtn.TextSize = 14
     Instance.new("UICorner", CloseBtn).CornerRadius = UDim.new(0, 6)
 
     local MinimizeBtn = Instance.new("TextButton", MainFrame)
-    MinimizeBtn.Size = UDim2.new(0, 28, 0, 28)
-    MinimizeBtn.Position = UDim2.new(1, -72, 0, 10)
-    MinimizeBtn.BackgroundColor3 = Color3.fromRGB(54, 59, 72)
-    MinimizeBtn.Text = "–"
-    MinimizeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    MinimizeBtn.Font = Enum.Font.GothamBold
-    MinimizeBtn.TextSize = 14
-    MinimizeBtn.ZIndex = 2
+    MinimizeBtn.Size = UDim2.new(0, 28, 0, 28); MinimizeBtn.Position = UDim2.new(1, -72, 0, 10)
+    MinimizeBtn.BackgroundColor3 = Color3.fromRGB(54, 59, 72); MinimizeBtn.Text = "–"; MinimizeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    MinimizeBtn.Font = Enum.Font.GothamBold; MinimizeBtn.TextSize = 14
     Instance.new("UICorner", MinimizeBtn).CornerRadius = UDim.new(0, 6)
 
     local DestroyBtn = Instance.new("TextButton", MainFrame)
-    DestroyBtn.Size = UDim2.new(0, 28, 0, 28)
-    DestroyBtn.Position = UDim2.new(1, -106, 0, 10)
-    DestroyBtn.BackgroundColor3 = Color3.fromRGB(180, 40, 40)
-    DestroyBtn.Text = "D"
-    DestroyBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    DestroyBtn.Font = Enum.Font.GothamBold
-    DestroyBtn.TextSize = 13
-    DestroyBtn.ZIndex = 2
+    DestroyBtn.Size = UDim2.new(0, 28, 0, 28); DestroyBtn.Position = UDim2.new(1, -106, 0, 10)
+    DestroyBtn.BackgroundColor3 = Color3.fromRGB(180, 40, 40); DestroyBtn.Text = "D"; DestroyBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    DestroyBtn.Font = Enum.Font.GothamBold; DestroyBtn.TextSize = 13
     Instance.new("UICorner", DestroyBtn).CornerRadius = UDim.new(0, 6)
 
     -- Header Title
     local TitleLabel = Instance.new("TextLabel", MainFrame)
-    TitleLabel.Size = UDim2.new(1, -50, 0, 40)
-    TitleLabel.Position = UDim2.new(0, 15, 0, 0)
-    TitleLabel.BackgroundTransparency = 1
-    TitleLabel.Font = Enum.Font.GothamBold
-    TitleLabel.TextSize = 14
-    TitleLabel.TextXAlignment = 0
-    TitleLabel.ZIndex = 2
+    TitleLabel.Size = UDim2.new(1, -50, 0, 40); TitleLabel.Position = UDim2.new(0, 15, 0, 0); TitleLabel.BackgroundTransparency = 1
+    TitleLabel.Font = Enum.Font.GothamBold; TitleLabel.TextSize = 14; TitleLabel.TextXAlignment = 0
 
     task.spawn(function()
         while ScreenGui and ScreenGui.Parent do
@@ -114,51 +91,30 @@ function Library:CreateWindow(config)
 
     -- Containers
     local TabContainer = Instance.new("Frame", MainFrame)
-    TabContainer.Size = UDim2.new(0, 110, 1, -55)
-    TabContainer.Position = UDim2.new(0, 12, 0, 45)
-    TabContainer.BackgroundTransparency = 1
-    TabContainer.ZIndex = 1
-    local TabList = Instance.new("UIListLayout", TabContainer)
-    TabList.Padding = UDim.new(0, 6)
+    TabContainer.Size = UDim2.new(0, 110, 1, -55); TabContainer.Position = UDim2.new(0, 12, 0, 45); TabContainer.BackgroundTransparency = 1
+    local TabList = Instance.new("UIListLayout", TabContainer); TabList.Padding = UDim.new(0, 6)
 
     local ContentContainer = Instance.new("Frame", MainFrame)
-    ContentContainer.Size = UDim2.new(1, -145, 1, -55)
-    ContentContainer.Position = UDim2.new(0, 133, 0, 45)
-    ContentContainer.BackgroundTransparency = 1
-    ContentContainer.ZIndex = 1
-
-    -- Biến trạng thái
-    local isMinimized = false
-    local isOpen = false
+    ContentContainer.Size = UDim2.new(1, -145, 1, -55); ContentContainer.Position = UDim2.new(0, 133, 0, 45); ContentContainer.BackgroundTransparency = 1
 
     -- Hiệu ứng mở menu
     local function OpenMenu()
-        isOpen = true
         MainFrame.Visible = true
         MainFrame.Size = UDim2.new(0, 0, 0, 0)
         MainFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
         MainFrame.BackgroundTransparency = 1
         
-        TweenService:Create(MainFrame, TweenInfo.new(0.5, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+        TweenService:Create(MainFrame, TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
             Size = FULL_SIZE,
             Position = UDim2.new(0.5, -230, 0.5, -160)
         }):Play()
-        TweenService:Create(MainFrame, TweenInfo.new(0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+        TweenService:Create(MainFrame, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
             BackgroundTransparency = 0
         }):Play()
-        
-        if isMinimized then
-            isMinimized = false
-            MinimizeBtn.Text = "–"
-            TabContainer.Visible = true
-            ContentContainer.Visible = true
-            MainFrame.ClipsDescendants = false
-        end
     end
 
     -- Hiệu ứng đóng menu
     local function CloseMenu()
-        isOpen = false
         TweenService:Create(MainFrame, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.In), {
             Size = UDim2.new(0, 0, 0, 0),
             BackgroundTransparency = 1,
@@ -169,18 +125,11 @@ function Library:CreateWindow(config)
         MainFrame.Size = FULL_SIZE
         MainFrame.Position = UDim2.new(0.5, -230, 0.5, -160)
         MainFrame.ClipsDescendants = true
-        
-        if isMinimized then
-            isMinimized = false
-            MinimizeBtn.Text = "–"
-            TabContainer.Visible = true
-            ContentContainer.Visible = true
-        end
     end
 
-    -- Mobile Toggle - Bật/tắt menu
+    -- Mobile Toggle
     MobileToggle.MouseButton1Click:Connect(function()
-        if isOpen then
+        if MainFrame.Visible then
             CloseMenu()
         else
             OpenMenu()
@@ -192,25 +141,30 @@ function Library:CreateWindow(config)
         CloseMenu()
     end)
 
-    -- Thu nhỏ Menu
+    -- Thu nhỏ Menu (sửa lỗi)
+    local isMinimized = false
+    local originalClips = true
+
     MinimizeBtn.MouseButton1Click:Connect(function()
-        if not isOpen then return end
-        
         isMinimized = not isMinimized
         
         if isMinimized then
+            -- Thu nhỏ
             MainFrame.ClipsDescendants = true
             TweenService:Create(MainFrame, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
                 Size = MINI_SIZE
             }):Play()
             MinimizeBtn.Text = "+"
+            -- Ẩn nội dung khi thu nhỏ
             TabContainer.Visible = false
             ContentContainer.Visible = false
         else
+            -- Mở rộng
             TweenService:Create(MainFrame, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
                 Size = FULL_SIZE
             }):Play()
             MinimizeBtn.Text = "–"
+            -- Hiện lại nội dung sau khi mở rộng
             task.wait(0.3)
             TabContainer.Visible = true
             ContentContainer.Visible = true
@@ -218,76 +172,137 @@ function Library:CreateWindow(config)
         end
     end)
 
-    -- Destroy Menu
+    -- Destroy Menu (sửa lỗi - xóa toàn bộ)
     DestroyBtn.MouseButton1Click:Connect(function()
         local ConfirmFrame = Instance.new("Frame", ScreenGui)
-        ConfirmFrame.Size = UDim2.new(0, 300, 0, 160)
-        ConfirmFrame.Position = UDim2.new(0.5, -150, 0.5, -80)
+        ConfirmFrame.Size = UDim2.new(0, 260, 0, 130)
+        ConfirmFrame.Position = UDim2.new(0.5, -130, 0.5, -65)
         ConfirmFrame.BackgroundColor3 = Color3.fromRGB(33, 36, 43)
-        ConfirmFrame.ZIndex = 10
-        ConfirmFrame.BorderSizePixel = 0
+        ConfirmFrame.ZIndex = 100
         Instance.new("UICorner", ConfirmFrame).CornerRadius = UDim.new(0, 8)
-        local ConfirmStroke = Instance.new("UIStroke", ConfirmFrame)
-        ConfirmStroke.Color = Color3.fromRGB(54, 59, 72)
-        ConfirmStroke.Thickness = 2
-        
-        local Overlay = Instance.new("Frame", ScreenGui)
-        Overlay.Size = UDim2.new(1, 0, 1, 0)
-        Overlay.Position = UDim2.new(0, 0, 0, 0)
-        Overlay.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-        Overlay.BackgroundTransparency = 0.5
-        Overlay.ZIndex = 9
-        Overlay.BorderSizePixel = 0
+        local ConfirmStroke = Instance.new("UIStroke", ConfirmFrame); ConfirmStroke.Color = Color3.fromRGB(54, 59, 72)
         
         local TextLabel = Instance.new("TextLabel", ConfirmFrame)
-        TextLabel.Size = UDim2.new(1, 0, 0, 50)
-        TextLabel.Position = UDim2.new(0, 0, 0, 15)
+        TextLabel.Size = UDim2.new(1, 0, 0.5, 0)
+        TextLabel.Position = UDim2.new(0, 0, 0, 10)
         TextLabel.BackgroundTransparency = 1
         TextLabel.Text = "Bạn có chắc chắn muốn\nXÓA HOÀN TOÀN menu không?"
         TextLabel.TextColor3 = Color3.fromRGB(230, 230, 230)
         TextLabel.Font = Enum.Font.GothamMedium
-        TextLabel.TextSize = 14
-        TextLabel.ZIndex = 11
-        TextLabel.TextWrapped = true
-        TextLabel.TextXAlignment = Enum.TextXAlignment.Center
-        
+        TextLabel.TextSize = 13
+        TextLabel.TextScaled = false
+
         local YesBtn = Instance.new("TextButton", ConfirmFrame)
-        YesBtn.Size = UDim2.new(0, 110, 0, 36)
-        YesBtn.Position = UDim2.new(0.1, 0, 0.7, 0)
+        YesBtn.Size = UDim2.new(0, 100, 0, 32)
+        YesBtn.Position = UDim2.new(0.12, 0, 0.7, 0)
         YesBtn.BackgroundColor3 = Color3.fromRGB(250, 60, 60)
         YesBtn.Text = "Xác Nhận"
         YesBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
         YesBtn.Font = Enum.Font.GothamBold
-        YesBtn.TextSize = 14
-        YesBtn.ZIndex = 11
+        YesBtn.TextSize = 13
         Instance.new("UICorner", YesBtn).CornerRadius = UDim.new(0, 6)
         
         local NoBtn = Instance.new("TextButton", ConfirmFrame)
-        NoBtn.Size = UDim2.new(0, 110, 0, 36)
-        NoBtn.Position = UDim2.new(0.55, 0, 0.7, 0)
+        NoBtn.Size = UDim2.new(0, 100, 0, 32)
+        NoBtn.Position = UDim2.new(0.56, 0, 0.7, 0)
         NoBtn.BackgroundColor3 = Color3.fromRGB(50, 53, 65)
         NoBtn.Text = "Hủy Bỏ"
         NoBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
         NoBtn.Font = Enum.Font.GothamBold
-        NoBtn.TextSize = 14
-        NoBtn.ZIndex = 11
+        NoBtn.TextSize = 13
         Instance.new("UICorner", NoBtn).CornerRadius = UDim.new(0, 6)
 
         NoBtn.MouseButton1Click:Connect(function()
             ConfirmFrame:Destroy()
-            Overlay:Destroy()
         end)
         
         YesBtn.MouseButton1Click:Connect(function()
-            ConfirmFrame:Destroy()
-            Overlay:Destroy()
+            -- Xóa toàn bộ ScreenGui (bao gồm cả MainFrame và MobileToggle)
             ScreenGui:Destroy()
         end)
     end)
 
-    -- Animation mở menu lần đầu
-    task.wait(0.15)
-    OpenMenu()
+
+    -- ==========================================
+    -- HỆ THỐNG INTRO ANIMATION 
+    -- ==========================================
+    local function PlayIntro()
+        local IntroFrame = Instance.new("Frame", ScreenGui)
+        IntroFrame.AnchorPoint = Vector2.new(0.5, 0.5)
+        IntroFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
+        IntroFrame.Size = UDim2.new(0, 0, 0, 0)
+        IntroFrame.BackgroundColor3 = Color3.fromRGB(20, 22, 27)
+        IntroFrame.BackgroundTransparency = 1
+        IntroFrame.ClipsDescendants = true
+        IntroFrame.ZIndex = 50
+        Instance.new("UICorner", IntroFrame).CornerRadius = UDim.new(0, 10)
+        
+        local IntroStroke = Instance.new("UIStroke", IntroFrame)
+        IntroStroke.Thickness = 2
+        IntroStroke.Color = Color3.fromRGB(0, 212, 255)
+        IntroStroke.Transparency = 1
+
+        local IntroTitle = Instance.new("TextLabel", IntroFrame)
+        IntroTitle.Size = UDim2.new(1, 0, 1, -20)
+        IntroTitle.BackgroundTransparency = 1
+        IntroTitle.Text = HubName
+        IntroTitle.TextColor3 = Color3.fromRGB(0, 212, 255)
+        IntroTitle.Font = Enum.Font.GothamBold
+        IntroTitle.TextSize = 26
+        IntroTitle.TextTransparency = 1
+        IntroTitle.ZIndex = 51
+        
+        local IntroAuthor = Instance.new("TextLabel", IntroFrame)
+        IntroAuthor.Size = UDim2.new(1, 0, 0, 30)
+        IntroAuthor.Position = UDim2.new(0, 0, 0.6, 0)
+        IntroAuthor.BackgroundTransparency = 1
+        IntroAuthor.Text = "Developed by " .. AuthorName
+        IntroAuthor.TextColor3 = Color3.fromRGB(200, 200, 200)
+        IntroAuthor.Font = Enum.Font.GothamMedium
+        IntroAuthor.TextSize = 13
+        IntroAuthor.TextTransparency = 1
+        IntroAuthor.ZIndex = 51
+
+        -- 1. Khởi tạo mượt mà khung Intro
+        TweenService:Create(IntroFrame, TweenInfo.new(0.6, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+            Size = UDim2.new(0, 280, 0, 120),
+            BackgroundTransparency = 0
+        }):Play()
+        TweenService:Create(IntroStroke, TweenInfo.new(0.6), {Transparency = 0}):Play()
+        task.wait(0.5)
+        
+        -- 2. Fade-in Chữ
+        TweenService:Create(IntroTitle, TweenInfo.new(0.4), {TextTransparency = 0}):Play()
+        task.wait(0.2)
+        TweenService:Create(IntroAuthor, TweenInfo.new(0.4), {TextTransparency = 0}):Play()
+        
+        -- 3. Thời gian hiển thị (Dừng lại để xem)
+        task.wait(1.5)
+        
+        -- 4. Fade-out Chữ
+        TweenService:Create(IntroTitle, TweenInfo.new(0.4), {TextTransparency = 1}):Play()
+        TweenService:Create(IntroAuthor, TweenInfo.new(0.4), {TextTransparency = 1}):Play()
+        task.wait(0.3)
+        
+        -- 5. Thu nhỏ khung và kết thúc
+        TweenService:Create(IntroFrame, TweenInfo.new(0.5, Enum.EasingStyle.Back, Enum.EasingDirection.In), {
+            Size = UDim2.new(0, 0, 0, 0),
+            BackgroundTransparency = 1
+        }):Play()
+        TweenService:Create(IntroStroke, TweenInfo.new(0.5), {Transparency = 1}):Play()
+        task.wait(0.5)
+        
+        IntroFrame:Destroy()
+        
+        -- Xong Intro thì hiện nút Mobile và Mở Menu chính
+        MobileToggle.Visible = true 
+        OpenMenu() 
+    end
+
+    -- Khởi chạy Intro (đã thay thế cho đoạn OpenMenu ngay lập tức của code cũ)
+    task.spawn(PlayIntro)
+    -- ==========================================
+
 
     local Window = { Pages = {}, TabButtons = {} }
 
@@ -300,7 +315,6 @@ function Library:CreateWindow(config)
         Page.ScrollBarThickness = 3
         Page.ScrollBarImageColor3 = Color3.fromRGB(80, 85, 100)
         Page.CanvasSize = UDim2.new(0, 0, 0, 0)
-        Page.ZIndex = 1
         
         local PageList = Instance.new("UIListLayout", Page)
         PageList.Padding = UDim.new(0, 6)
@@ -316,7 +330,6 @@ function Library:CreateWindow(config)
         TabBtn.Font = Enum.Font.GothamBold
         TabBtn.TextSize = 11
         TabBtn.TextXAlignment = 0
-        TabBtn.ZIndex = 1
         Instance.new("UICorner", TabBtn).CornerRadius = UDim.new(0, 6)
         local BtnStroke = Instance.new("UIStroke", TabBtn)
         BtnStroke.Color = Color3.fromRGB(40, 44, 54)
