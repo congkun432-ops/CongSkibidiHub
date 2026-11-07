@@ -2,30 +2,57 @@
 local Library = {}
 
 function Library:CreateWindow(config)
-    config = config or {}
-    local HubName = config.HubName or "Setchauphi"
-    local AuthorName = config.AuthorName or "Courier cat"
+    if type(config) ~= "table" then config = {} end
+    local HubName = tostring(config.HubName or "Setchauphi")
+    local AuthorName = tostring(config.AuthorName or "Courier cat")
 
     local TweenService = game:GetService("TweenService")
-    local CoreGui = game:GetService("CoreGui") or game:GetService("Players").LocalPlayer:WaitForChild("PlayerGui")
+    local UserInputService = game:GetService("UserInputService")
+    local Players = game:GetService("Players")
+
+    -- [FIX] Safe parent GUI (CoreGui có thể bị chặn / nil)
+    local parentGui
+    local coreGui = game:GetService("CoreGui")
+    if coreGui then
+        local ok = pcall(function()
+            local test = Instance.new("ScreenGui")
+            test.Parent = coreGui
+            test:Destroy()
+        end)
+        if ok then parentGui = coreGui end
+    end
+    if not parentGui then
+        local player = Players.LocalPlayer
+        if not player then
+            error("CyberVibe: CreateWindow phải được gọi từ LocalScript (client).")
+        end
+        parentGui = player:WaitForChild("PlayerGui")
+    end
+
+    -- [FIX] Xoá hub cũ (tránh tạo nhiều ScreenGui cùng tên + nhiều vòng lặp rainbow)
+    do
+        local existing = parentGui:FindFirstChild("CyberVibe_Hub")
+        if existing then pcall(function() existing:Destroy() end) end
+    end
 
     -- ScreenGui Chứa Toàn Bộ UI
-    local ScreenGui = Instance.new("ScreenGui", CoreGui)
+    local ScreenGui = Instance.new("ScreenGui")
     ScreenGui.Name = "CyberVibe_Hub"
     ScreenGui.ResetOnSpawn = false
+    ScreenGui.Parent = parentGui
 
     -- Mobile Toggle Button (Mini Menu)
     local MobileToggle = Instance.new("TextButton", ScreenGui)
     MobileToggle.Size = UDim2.new(0, 65, 0, 65)
     MobileToggle.Position = UDim2.new(0, 15, 0, 15)
     MobileToggle.BackgroundColor3 = Color3.fromRGB(25, 27, 34)
-    MobileToggle.Text = "" 
-    MobileToggle.Draggable = true 
+    MobileToggle.Text = ""
+    MobileToggle.Draggable = true
     MobileToggle.Visible = true
     Instance.new("UICorner", MobileToggle).CornerRadius = UDim.new(1, 0)
     local ToggleStroke = Instance.new("UIStroke", MobileToggle); ToggleStroke.Thickness = 2
     local ToggleIcon = Instance.new("ImageLabel", MobileToggle)
-    ToggleIcon.Size = UDim2.new(1, 0, 1, 0) 
+    ToggleIcon.Size = UDim2.new(1, 0, 1, 0)
     ToggleIcon.BackgroundTransparency = 1
     ToggleIcon.Image = "rbxassetid://134586557209278"
     ToggleIcon.ImageColor3 = Color3.fromRGB(255, 255, 255)
@@ -44,7 +71,7 @@ function Library:CreateWindow(config)
     MainFrame.Visible = false
     MainFrame.BackgroundTransparency = 1
     MainFrame.ClipsDescendants = true
-    
+
     local MainStroke = Instance.new("UIStroke", MainFrame); MainStroke.Thickness = 1.5
     Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 10)
 
@@ -72,14 +99,17 @@ function Library:CreateWindow(config)
     TitleLabel.Size = UDim2.new(1, -50, 0, 40); TitleLabel.Position = UDim2.new(0, 15, 0, 0); TitleLabel.BackgroundTransparency = 1
     TitleLabel.Font = Enum.Font.GothamBold; TitleLabel.TextSize = 14; TitleLabel.TextXAlignment = 0
 
+    -- [FIX] Dùng os.clock thay tick (tick deprecated), và tự dừng khi ScreenGui chết
     task.spawn(function()
         while ScreenGui and ScreenGui.Parent do
-            local hue = (tick() % 6) / 6
+            local hue = (os.clock() % 6) / 6
             local rainbow = Color3.fromHSV(hue, 0.7, 1)
-            MainStroke.Color = rainbow
-            TitleLabel.TextColor3 = rainbow
-            ToggleStroke.Color = rainbow
-            TitleLabel.Text = "🔮  " .. HubName .. "  |  By: " .. AuthorName
+            if MainStroke and MainStroke.Parent then MainStroke.Color = rainbow end
+            if TitleLabel and TitleLabel.Parent then
+                TitleLabel.TextColor3 = rainbow
+                TitleLabel.Text = "🔮  " .. HubName .. "  |  By: " .. AuthorName
+            end
+            if ToggleStroke and ToggleStroke.Parent then ToggleStroke.Color = rainbow end
             task.wait(0.03)
         end
     end)
@@ -95,17 +125,30 @@ function Library:CreateWindow(config)
     -- State variables
     local isMinimized = false
     local isMenuVisible = false
+    local userToggled = false
+
+    -- [FIX] Token chống race condition khi open/close liên tục
+    local animToken = 0
+    local function newAnimToken()
+        animToken = animToken + 1
+        return animToken
+    end
+    local function isValidToken(t)
+        return t == animToken and ScreenGui.Parent ~= nil
+    end
 
     -- Hiệu ứng mở menu với animation
     local function OpenMenu()
-        if isMenuVisible then return end
+        if isMenuVisible or not ScreenGui.Parent then return end
         isMenuVisible = true
+        local myToken = newAnimToken()
+
         MainFrame.Visible = true
+        MainFrame.ClipsDescendants = true
         MainFrame.Size = UDim2.new(0, 0, 0, 0)
         MainFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
         MainFrame.BackgroundTransparency = 1
-        MainFrame.ClipsDescendants = true
-        
+
         -- Reset trạng thái minimize khi mở menu
         if isMinimized then
             isMinimized = false
@@ -113,8 +156,7 @@ function Library:CreateWindow(config)
             TabContainer.Visible = true
             ContentContainer.Visible = true
         end
-        
-        -- Animation mở menu với hiệu ứng bounce
+
         TweenService:Create(MainFrame, TweenInfo.new(0.5, Enum.EasingStyle.Back, Enum.EasingDirection.Out, 0, false, 0), {
             Size = FULL_SIZE,
             Position = UDim2.new(0.5, -230, 0.5, -160)
@@ -122,24 +164,30 @@ function Library:CreateWindow(config)
         TweenService:Create(MainFrame, TweenInfo.new(0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
             BackgroundTransparency = 0
         }):Play()
-        
-        -- Hiệu ứng glow khi mở
-        task.wait(0.1)
-        local glowFrame = Instance.new("Frame", MainFrame)
-        glowFrame.Size = UDim2.new(1, 10, 1, 10)
-        glowFrame.Position = UDim2.new(0, -5, 0, -5)
-        glowFrame.BackgroundColor3 = Color3.fromRGB(0, 212, 255)
-        glowFrame.BackgroundTransparency = 0.8
-        glowFrame.ZIndex = 0
-        Instance.new("UICorner", glowFrame).CornerRadius = UDim.new(0, 12)
-        
-        TweenService:Create(glowFrame, TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-            BackgroundTransparency = 1,
-            Size = UDim2.new(1, 20, 1, 20),
-            Position = UDim2.new(0, -10, 0, -10)
-        }):Play()
+
+        -- [FIX] Chờ tween xong mới mở clip để dropdown/glow không bị cắt,
+        -- và kiểm tra token để tránh chạy sai khi user đóng/mở liên tục.
         task.wait(0.5)
-        glowFrame:Destroy()
+        if not isValidToken(myToken) then return end
+        MainFrame.ClipsDescendants = false
+
+        -- Hiệu ứng glow khi mở (tạo sau khi hết clip)
+        local glowFrame = Instance.new("Frame", MainFrame)
+        glowFrame.Size = UDim2.new(1, 0, 1, 0)
+        glowFrame.Position = UDim2.new(0, 0, 0, 0)
+        glowFrame.BackgroundColor3 = Color3.fromRGB(0, 212, 255)
+        glowFrame.BackgroundTransparency = 0.6
+        glowFrame.ZIndex = 0
+        Instance.new("UICorner", glowFrame).CornerRadius = UDim.new(0, 10)
+
+        TweenService:Create(glowFrame, TweenInfo.new(0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+            BackgroundTransparency = 1,
+            Size = UDim2.new(1, 16, 1, 16),
+            Position = UDim2.new(0, -8, 0, -8)
+        }):Play()
+        task.delay(0.5, function()
+            if glowFrame and glowFrame.Parent then glowFrame:Destroy() end
+        end)
     end
 
     -- Hiệu ứng đóng menu
@@ -150,13 +198,18 @@ function Library:CreateWindow(config)
         MinimizeBtn.Text = "–"
         TabContainer.Visible = true
         ContentContainer.Visible = true
-        
+
+        -- [FIX] Bật clip trong lúc đóng để children không tràn ra ngoài
+        MainFrame.ClipsDescendants = true
+        newAnimToken() -- vô hiệu token cũ
+
         TweenService:Create(MainFrame, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.In), {
             Size = UDim2.new(0, 0, 0, 0),
             BackgroundTransparency = 1,
             Position = UDim2.new(0.5, 0, 0.5, 0)
         }):Play()
         task.wait(0.3)
+        if not ScreenGui.Parent then return end
         MainFrame.Visible = false
         MainFrame.Size = FULL_SIZE
         MainFrame.Position = UDim2.new(0.5, -230, 0.5, -160)
@@ -165,6 +218,7 @@ function Library:CreateWindow(config)
 
     -- Mobile Toggle
     MobileToggle.MouseButton1Click:Connect(function()
+        userToggled = true
         if isMenuVisible then
             CloseMenu()
         else
@@ -172,19 +226,17 @@ function Library:CreateWindow(config)
         end
     end)
 
-    -- Close Button (X) - đóng menu và reset về trạng thái ban đầu
+    -- Close Button (X)
     CloseBtn.MouseButton1Click:Connect(function()
         CloseMenu()
     end)
 
-    -- Minimize Button (Thu nhỏ/Mở rộng)
+    -- Minimize Button
     MinimizeBtn.MouseButton1Click:Connect(function()
-        if not isMenuVisible then return end
-        
+        if not isMenuVisible or not ScreenGui.Parent then return end
         isMinimized = not isMinimized
-        
+
         if isMinimized then
-            -- Thu nhỏ
             MainFrame.ClipsDescendants = true
             TweenService:Create(MainFrame, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
                 Size = MINI_SIZE
@@ -193,20 +245,28 @@ function Library:CreateWindow(config)
             TabContainer.Visible = false
             ContentContainer.Visible = false
         else
-            -- Mở rộng
             TweenService:Create(MainFrame, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
                 Size = FULL_SIZE
             }):Play()
             MinimizeBtn.Text = "–"
-            task.wait(0.3)
             TabContainer.Visible = true
             ContentContainer.Visible = true
-            MainFrame.ClipsDescendants = false
+            -- [FIX] Chờ resize xong mới tắt clip
+            task.delay(0.3, function()
+                if ScreenGui.Parent and isMenuVisible and not isMinimized then
+                    MainFrame.ClipsDescendants = false
+                end
+            end)
         end
     end)
 
     -- Destroy Menu với hộp thoại xác nhận đầy đủ
+    local confirmOpen = false
     DestroyBtn.MouseButton1Click:Connect(function()
+        -- [FIX] Chặn mở nhiều hộp xác nhận
+        if confirmOpen or not ScreenGui.Parent then return end
+        confirmOpen = true
+
         local ConfirmFrame = Instance.new("Frame", ScreenGui)
         ConfirmFrame.Size = UDim2.new(0, 280, 0, 140)
         ConfirmFrame.Position = UDim2.new(0.5, -140, 0.5, -70)
@@ -216,8 +276,7 @@ function Library:CreateWindow(config)
         local ConfirmStroke = Instance.new("UIStroke", ConfirmFrame)
         ConfirmStroke.Color = Color3.fromRGB(0, 212, 255)
         ConfirmStroke.Thickness = 1.5
-        
-        -- Tiêu đề
+
         local Title = Instance.new("TextLabel", ConfirmFrame)
         Title.Size = UDim2.new(1, 0, 0, 35)
         Title.Position = UDim2.new(0, 0, 0, 0)
@@ -226,8 +285,7 @@ function Library:CreateWindow(config)
         Title.TextColor3 = Color3.fromRGB(255, 80, 80)
         Title.Font = Enum.Font.GothamBold
         Title.TextSize = 16
-        
-        -- Nội dung
+
         local TextLabel = Instance.new("TextLabel", ConfirmFrame)
         TextLabel.Size = UDim2.new(1, -20, 0, 40)
         TextLabel.Position = UDim2.new(0, 10, 0, 40)
@@ -239,7 +297,6 @@ function Library:CreateWindow(config)
         TextLabel.TextScaled = false
         TextLabel.TextXAlignment = 1
 
-        -- Nút xác nhận
         local YesBtn = Instance.new("TextButton", ConfirmFrame)
         YesBtn.Size = UDim2.new(0, 110, 0, 34)
         YesBtn.Position = UDim2.new(0.08, 0, 0.75, 0)
@@ -249,8 +306,7 @@ function Library:CreateWindow(config)
         YesBtn.Font = Enum.Font.GothamBold
         YesBtn.TextSize = 13
         Instance.new("UICorner", YesBtn).CornerRadius = UDim.new(0, 6)
-        
-        -- Nút hủy
+
         local NoBtn = Instance.new("TextButton", ConfirmFrame)
         NoBtn.Size = UDim2.new(0, 110, 0, 34)
         NoBtn.Position = UDim2.new(0.56, 0, 0.75, 0)
@@ -262,35 +318,40 @@ function Library:CreateWindow(config)
         Instance.new("UICorner", NoBtn).CornerRadius = UDim.new(0, 6)
 
         NoBtn.MouseButton1Click:Connect(function()
+            confirmOpen = false
             ConfirmFrame:Destroy()
         end)
-        
+
         YesBtn.MouseButton1Click:Connect(function()
-            -- Animation xóa
+            -- Huỷ mọi animation đang chạy
+            newAnimToken()
             TweenService:Create(ConfirmFrame, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
                 Size = UDim2.new(0, 0, 0, 0),
                 BackgroundTransparency = 1
             }):Play()
             task.wait(0.2)
-            ConfirmFrame:Destroy()
-            
-            -- Xóa toàn bộ ScreenGui
+            if ConfirmFrame and ConfirmFrame.Parent then ConfirmFrame:Destroy() end
+            if not ScreenGui.Parent then return end
             TweenService:Create(MainFrame, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.In), {
                 Size = UDim2.new(0, 0, 0, 0),
                 BackgroundTransparency = 1
             }):Play()
             task.wait(0.3)
-            ScreenGui:Destroy()
+            if ScreenGui and ScreenGui.Parent then ScreenGui:Destroy() end
         end)
     end)
 
-    -- Mở menu tự động khi load với animation
+    -- [FIX] Tránh tự động mở đè nếu user đã tự tay bấm toggle trong 0.1s đầu
     task.wait(0.1)
-    OpenMenu()
+    if not userToggled and not isMenuVisible and ScreenGui.Parent then
+        OpenMenu()
+    end
 
     local Window = { Pages = {}, TabButtons = {} }
 
     function Window:CreateTab(name)
+        name = tostring(name or "Tab")
+
         local Page = Instance.new("ScrollingFrame", ContentContainer)
         Page.Name = name .. "Page"
         Page.Size = UDim2.new(1, 0, 1, 0)
@@ -299,7 +360,7 @@ function Library:CreateWindow(config)
         Page.ScrollBarThickness = 3
         Page.ScrollBarImageColor3 = Color3.fromRGB(80, 85, 100)
         Page.CanvasSize = UDim2.new(0, 0, 0, 0)
-        
+
         local PageList = Instance.new("UIListLayout", Page)
         PageList.Padding = UDim.new(0, 6)
         PageList:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
@@ -351,34 +412,34 @@ function Library:CreateWindow(config)
             local SwitchFrame = Instance.new("Frame", Page)
             SwitchFrame.Size = UDim2.new(1, 0, 0, 38)
             SwitchFrame.BackgroundTransparency = 1
-            
+
             local Label = Instance.new("TextLabel", SwitchFrame)
             Label.Size = UDim2.new(0.6, 0, 1, 0)
-            Label.Text = labelText
+            Label.Text = tostring(labelText or "Switch")
             Label.TextColor3 = Color3.fromRGB(230, 230, 230)
             Label.Font = Enum.Font.GothamMedium
             Label.TextSize = 13
             Label.BackgroundTransparency = 1
             Label.TextXAlignment = 0
-            
+
             local BG = Instance.new("Frame", SwitchFrame)
             BG.Size = UDim2.new(0, 38, 0, 20)
             BG.Position = UDim2.new(1, -45, 0.5, -10)
             BG.BackgroundColor3 = default and Color3.fromRGB(0, 168, 204) or Color3.fromRGB(45, 48, 56)
             Instance.new("UICorner", BG).CornerRadius = UDim.new(1, 0)
-            
+
             local Ball = Instance.new("Frame", BG)
             Ball.Size = UDim2.new(0, 14, 0, 14)
             Ball.Position = default and UDim2.new(1, -18, 0.5, -7) or UDim2.new(0, 3, 0.5, -7)
             Ball.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
             Instance.new("UICorner", Ball).CornerRadius = UDim.new(1, 0)
-            
+
             local ClickBtn = Instance.new("TextButton", SwitchFrame)
             ClickBtn.Size = UDim2.new(1, 0, 1, 0)
             ClickBtn.BackgroundTransparency = 1
             ClickBtn.Text = ""
-            
-            local state = default or false
+
+            local state = default and true or false
             ClickBtn.MouseButton1Click:Connect(function()
                 state = not state
                 TweenService:Create(Ball, TweenInfo.new(0.2, Enum.EasingStyle.Quad), {
@@ -387,7 +448,7 @@ function Library:CreateWindow(config)
                 TweenService:Create(BG, TweenInfo.new(0.2, Enum.EasingStyle.Quad), {
                     BackgroundColor3 = state and Color3.fromRGB(0, 168, 204) or Color3.fromRGB(45, 48, 56)
                 }):Play()
-                callback(state)
+                if callback then callback(state) end
             end)
         end
 
@@ -395,22 +456,22 @@ function Library:CreateWindow(config)
             local BoxFrame = Instance.new("Frame", Page)
             BoxFrame.Size = UDim2.new(1, 0, 0, 38)
             BoxFrame.BackgroundTransparency = 1
-            
+
             local Label = Instance.new("TextLabel", BoxFrame)
             Label.Size = UDim2.new(0.5, 0, 1, 0)
-            Label.Text = labelText
+            Label.Text = tostring(labelText or "Input")
             Label.TextColor3 = Color3.fromRGB(230, 230, 230)
             Label.Font = Enum.Font.GothamMedium
             Label.TextSize = 13
             Label.BackgroundTransparency = 1
             Label.TextXAlignment = 0
-            
+
             local Input = Instance.new("TextBox", BoxFrame)
             Input.Size = UDim2.new(0, 65, 0, 26)
             Input.Position = UDim2.new(1, -70, 0.5, -13)
             Input.BackgroundColor3 = Color3.fromRGB(33, 36, 43)
             Input.TextColor3 = Color3.fromRGB(0, 212, 255)
-            Input.Text = placeholder or ""
+            Input.Text = tostring(placeholder or "")
             Input.TextSize = 12
             Input.Font = Enum.Font.GothamBold
             Input.ClearTextOnFocus = true
@@ -418,9 +479,9 @@ function Library:CreateWindow(config)
             local BoxStroke = Instance.new("UIStroke", Input)
             BoxStroke.Color = Color3.fromRGB(54, 59, 72)
             BoxStroke.Thickness = 1
-            
+
             Input.FocusLost:Connect(function()
-                callback(Input.Text)
+                if callback then callback(Input.Text) end
             end)
         end
 
@@ -428,22 +489,22 @@ function Library:CreateWindow(config)
             local ButtonFrame = Instance.new("Frame", Page)
             ButtonFrame.Size = UDim2.new(1, 0, 0, 38)
             ButtonFrame.BackgroundTransparency = 1
-            
+
             local Label = Instance.new("TextLabel", ButtonFrame)
             Label.Size = UDim2.new(0.5, 0, 1, 0)
-            Label.Text = labelText
+            Label.Text = tostring(labelText or "Action")
             Label.TextColor3 = Color3.fromRGB(230, 230, 230)
             Label.Font = Enum.Font.GothamMedium
             Label.TextSize = 13
             Label.BackgroundTransparency = 1
             Label.TextXAlignment = 0
-            
+
             local ActionBtn = Instance.new("TextButton", ButtonFrame)
             ActionBtn.Size = UDim2.new(0, 100, 0, 28)
             ActionBtn.Position = UDim2.new(1, -105, 0.5, -14)
             ActionBtn.BackgroundColor3 = Color3.fromRGB(33, 36, 43)
             ActionBtn.TextColor3 = Color3.fromRGB(0, 212, 255)
-            ActionBtn.Text = buttonText or "Click"
+            ActionBtn.Text = tostring(buttonText or "Click")
             ActionBtn.TextSize = 12
             ActionBtn.Font = Enum.Font.GothamBold
             Instance.new("UICorner", ActionBtn).CornerRadius = UDim.new(0, 6)
@@ -461,31 +522,33 @@ function Library:CreateWindow(config)
                     BackgroundColor3 = Color3.fromRGB(33, 36, 43),
                     TextColor3 = Color3.fromRGB(0, 212, 255)
                 }):Play()
-                callback()
+                if callback then callback() end
             end)
         end
 
         function Tab:AddDropdown(labelText, options, callback)
+            if type(options) ~= "table" then options = {} end
+
             local DropdownFrame = Instance.new("Frame", Page)
             DropdownFrame.Size = UDim2.new(1, 0, 0, 38)
             DropdownFrame.BackgroundTransparency = 1
-            DropdownFrame.ClipsDescendants = false 
-            
+            DropdownFrame.ClipsDescendants = false
+
             local Label = Instance.new("TextLabel", DropdownFrame)
             Label.Size = UDim2.new(0.4, 0, 1, 0)
-            Label.Text = labelText
+            Label.Text = tostring(labelText or "Select")
             Label.TextColor3 = Color3.fromRGB(230, 230, 230)
             Label.Font = Enum.Font.GothamMedium
             Label.TextSize = 13
             Label.BackgroundTransparency = 1
             Label.TextXAlignment = 0
-            
+
             local MainBtn = Instance.new("TextButton", DropdownFrame)
             MainBtn.Size = UDim2.new(0, 130, 0, 28)
             MainBtn.Position = UDim2.new(1, -135, 0.5, -14)
             MainBtn.BackgroundColor3 = Color3.fromRGB(33, 36, 43)
             MainBtn.TextColor3 = Color3.fromRGB(0, 212, 255)
-            MainBtn.Text = options[1] or "None"
+            MainBtn.Text = tostring(options[1] or "None")
             MainBtn.Font = Enum.Font.GothamBold
             MainBtn.TextSize = 12
             Instance.new("UICorner", MainBtn).CornerRadius = UDim.new(0, 6)
@@ -522,19 +585,147 @@ function Library:CreateWindow(config)
                 local OptBtn = Instance.new("TextButton", ScrollList)
                 OptBtn.Size = UDim2.new(1, 0, 0, 25)
                 OptBtn.BackgroundTransparency = 1
-                OptBtn.Text = optionName
+                OptBtn.Text = tostring(optionName)
                 OptBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
                 OptBtn.Font = Enum.Font.GothamMedium
                 OptBtn.TextSize = 11
                 OptBtn.ZIndex = 11
-                
+
                 OptBtn.MouseButton1Click:Connect(function()
-                    MainBtn.Text = optionName
+                    MainBtn.Text = tostring(optionName)
                     isOpen = false
                     ScrollList.Visible = false
-                    callback(optionName)
+                    if callback then callback(optionName) end
                 end)
             end
+        end
+
+        -- [MỚI] Thanh kéo chỉnh thông số
+        function Tab:AddSlider(labelText, minValue, maxValue, defaultValue, callback, decimals)
+            minValue = tonumber(minValue) or 0
+            maxValue = tonumber(maxValue) or 100
+            if maxValue <= minValue then maxValue = minValue + 1 end
+            decimals = math.clamp(math.floor(tonumber(decimals) or 0), 0, 10)
+            defaultValue = math.clamp(tonumber(defaultValue) or minValue, minValue, maxValue)
+
+            local SliderFrame = Instance.new("Frame", Page)
+            SliderFrame.Size = UDim2.new(1, 0, 0, 46)
+            SliderFrame.BackgroundTransparency = 1
+
+            local Label = Instance.new("TextLabel", SliderFrame)
+            Label.Size = UDim2.new(0.7, 0, 0, 20)
+            Label.Position = UDim2.new(0, 0, 0, 0)
+            Label.Text = tostring(labelText or "Slider")
+            Label.TextColor3 = Color3.fromRGB(230, 230, 230)
+            Label.Font = Enum.Font.GothamMedium
+            Label.TextSize = 13
+            Label.BackgroundTransparency = 1
+            Label.TextXAlignment = 0
+
+            local ValueLabel = Instance.new("TextLabel", SliderFrame)
+            ValueLabel.Size = UDim2.new(0, 70, 0, 20)
+            ValueLabel.Position = UDim2.new(1, -70, 0, 0)
+            ValueLabel.Text = string.format("%." .. decimals .. "f", defaultValue)
+            ValueLabel.TextColor3 = Color3.fromRGB(0, 212, 255)
+            ValueLabel.Font = Enum.Font.GothamBold
+            ValueLabel.TextSize = 13
+            ValueLabel.BackgroundTransparency = 1
+            ValueLabel.TextXAlignment = 1
+
+            local Track = Instance.new("Frame", SliderFrame)
+            Track.Size = UDim2.new(1, 0, 0, 6)
+            Track.Position = UDim2.new(0, 0, 0, 30)
+            Track.BackgroundColor3 = Color3.fromRGB(45, 48, 56)
+            Track.BorderSizePixel = 0
+            Instance.new("UICorner", Track).CornerRadius = UDim.new(1, 0)
+
+            local initAlpha = (defaultValue - minValue) / (maxValue - minValue)
+
+            local Fill = Instance.new("Frame", Track)
+            Fill.Size = UDim2.new(initAlpha, 0, 1, 0)
+            Fill.BackgroundColor3 = Color3.fromRGB(0, 168, 204)
+            Fill.BorderSizePixel = 0
+            Fill.ZIndex = 2
+            Instance.new("UICorner", Fill).CornerRadius = UDim.new(1, 0)
+
+            local Ball = Instance.new("Frame", Track)
+            Ball.Size = UDim2.new(0, 14, 0, 14)
+            Ball.Position = UDim2.new(initAlpha, -7, 0.5, -7)
+            Ball.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+            Ball.ZIndex = 3
+            Instance.new("UICorner", Ball).CornerRadius = UDim.new(1, 0)
+            local BallStroke = Instance.new("UIStroke", Ball)
+            BallStroke.Color = Color3.fromRGB(0, 212, 255)
+            BallStroke.Thickness = 1.5
+
+            -- Vùng bắt chuột/touch phủ cả thanh
+            local HitArea = Instance.new("TextButton", SliderFrame)
+            HitArea.Size = UDim2.new(1, 0, 0, 24)
+            HitArea.Position = UDim2.new(0, 0, 0, 20)
+            HitArea.BackgroundTransparency = 1
+            HitArea.Text = ""
+            HitArea.ZIndex = 5
+
+            local currentValue = defaultValue
+            local isDragging = false
+
+            local function ApplyValue(v, fireCallback)
+                currentValue = math.clamp(v, minValue, maxValue)
+                local alpha = (currentValue - minValue) / (maxValue - minValue)
+                Fill.Size = UDim2.new(alpha, 0, 1, 0)
+                Ball.Position = UDim2.new(alpha, -7, 0.5, -7)
+                ValueLabel.Text = string.format("%." .. decimals .. "f", currentValue)
+                if fireCallback and callback then
+                    callback(currentValue)
+                end
+            end
+
+            local function UpdateFromInput(input)
+                if not Track or not Track.Parent then return end
+                if Track.AbsoluteSize.X <= 0 then return end
+                local relX = input.Position.X - Track.AbsolutePosition.X
+                local alpha = math.clamp(relX / Track.AbsoluteSize.X, 0, 1)
+                ApplyValue(minValue + alpha * (maxValue - minValue), true)
+            end
+
+            HitArea.InputBegan:Connect(function(input)
+                if input.UserInputType == Enum.UserInputType.MouseButton1
+                or input.UserInputType == Enum.UserInputType.Touch then
+                    isDragging = true
+                    UpdateFromInput(input)
+                end
+            end)
+
+            local changedConn = UserInputService.InputChanged:Connect(function(input)
+                if isDragging and (input.UserInputType == Enum.UserInputType.MouseMovement
+                or input.UserInputType == Enum.UserInputType.Touch) then
+                    UpdateFromInput(input)
+                end
+            end)
+
+            local endedConn = UserInputService.InputEnded:Connect(function(input)
+                if input.UserInputType == Enum.UserInputType.MouseButton1
+                or input.UserInputType == Enum.UserInputType.Touch then
+                    isDragging = false
+                end
+            end)
+
+            -- Tự dọn connection khi Page/ScreenGui bị destroy
+            SliderFrame.AncestryChanged:Connect(function(_, parent)
+                if not parent then
+                    if changedConn then changedConn:Disconnect() end
+                    if endedConn then endedConn:Disconnect() end
+                end
+            end)
+
+            local Slider = {}
+            function Slider:Set(v)
+                ApplyValue(v, true)
+            end
+            function Slider:Get()
+                return currentValue
+            end
+            return Slider
         end
 
         function Tab:GetPageContainer()
