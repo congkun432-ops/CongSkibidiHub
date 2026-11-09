@@ -1,12 +1,14 @@
--- [[ CYBERVIBE UI LIBRARY MODULE - v2 ]]
+--═══════════════════════════════════════════════════════════════
+--  [[ CYBERVIBE UI LIBRARY MODULE - v2.1 FINAL ]]
+--═══════════════════════════════════════════════════════════════
 local Library = {}
 
 --------------------------------------------------------------------
--- CORE HELPERS
+-- HELPERS
 --------------------------------------------------------------------
 local windowSlot = 0
 local notifySlot = 0
-local NotifyGui = nil
+local NotifyGui  = nil
 
 local function GetCoreGui()
     local ok, cg = pcall(function() return game:GetService("CoreGui") end)
@@ -30,12 +32,12 @@ local function EnsureNotifyGui()
 
     local Container = Instance.new("Frame", NotifyGui)
     Container.Name = "Container"
-    Container.Size = UDim2.new(0, 290, 0, 0)
-    Container.Position = UDim2.new(1, -305, 0, 50)
+    Container.Size = UDim2.new(0, 340, 0, 0)
+    Container.Position = UDim2.new(1, -355, 0, 50)
     Container.BackgroundTransparency = 1
 
     local Layout = Instance.new("UIListLayout", Container)
-    Layout.Padding = UDim.new(0, 6)
+    Layout.Padding = UDim.new(0, 5)
     Layout.SortOrder = Enum.SortOrder.LayoutOrder
     Layout.HorizontalAlignment = Enum.HorizontalAlignment.Right
 
@@ -56,79 +58,71 @@ function Library:Notify(config)
 
     notifySlot = notifySlot + 1
 
-    -- Đo chiều cao nội dung
-    local contentHeight = 16
+    local TEXT_W = 310
+    local contentHeight = 14
     if Content and #Content > 0 then
         local ok, bounds = pcall(function()
-            return TextSvc:GetTextSize(Content, 12, Enum.Font.GothamMedium, Vector2.new(250, 1000))
+            return TextSvc:GetTextSize(Content, 11, Enum.Font.GothamMedium, Vector2.new(TEXT_W, 1000))
         end)
         if ok and bounds then
-            contentHeight = math.max(16, bounds.Y)
+            contentHeight = math.max(14, bounds.Y)
         end
     end
-    local totalHeight = math.max(60, 30 + contentHeight + 12)
+    local totalHeight = math.max(42, 20 + contentHeight + 6)
 
-    -- Frame chính
     local Notif = Instance.new("Frame")
     Notif.Size = UDim2.new(1, 0, 0, 0)
     Notif.BackgroundColor3 = Color3.fromRGB(25, 27, 34)
     Notif.BorderSizePixel = 0
     Notif.LayoutOrder = notifySlot
     Notif.ZIndex = 2
-    Instance.new("UICorner", Notif).CornerRadius = UDim.new(0, 8)
+    Instance.new("UICorner", Notif).CornerRadius = UDim.new(0, 7)
 
     local Stroke = Instance.new("UIStroke", Notif)
     Stroke.Color = Accent
-    Stroke.Thickness = 1.5
-    Stroke.Transparency = 0.3
+    Stroke.Thickness = 1.2
+    Stroke.Transparency = 0.35
     Stroke.ZIndex = 3
 
-    -- Thanh accent bên trái
     local AccentBar = Instance.new("Frame", Notif)
-    AccentBar.Size = UDim2.new(0, 4, 1, -10)
-    AccentBar.Position = UDim2.new(0, 4, 0, 5)
+    AccentBar.Size = UDim2.new(0, 3, 1, -8)
+    AccentBar.Position = UDim2.new(0, 4, 0, 4)
     AccentBar.BackgroundColor3 = Accent
     AccentBar.BorderSizePixel = 0
     AccentBar.ZIndex = 3
     Instance.new("UICorner", AccentBar).CornerRadius = UDim.new(1, 0)
 
-    -- Title
     local TitleLbl = Instance.new("TextLabel", Notif)
-    TitleLbl.Size = UDim2.new(1, -35, 0, 20)
-    TitleLbl.Position = UDim2.new(0, 16, 0, 6)
+    TitleLbl.Size = UDim2.new(1, -18, 0, 16)
+    TitleLbl.Position = UDim2.new(0, 13, 0, 3)
     TitleLbl.BackgroundTransparency = 1
     TitleLbl.Text = Title
     TitleLbl.TextColor3 = Accent
     TitleLbl.Font = Enum.Font.GothamBold
-    TitleLbl.TextSize = 13
+    TitleLbl.TextSize = 12
     TitleLbl.TextXAlignment = 0
     TitleLbl.ZIndex = 3
 
-    -- Content
     local ContentLbl = Instance.new("TextLabel", Notif)
-    ContentLbl.Size = UDim2.new(1, -35, 0, contentHeight)
-    ContentLbl.Position = UDim2.new(0, 16, 0, 26)
+    ContentLbl.Size = UDim2.new(1, -18, 0, contentHeight)
+    ContentLbl.Position = UDim2.new(0, 13, 0, 20)
     ContentLbl.BackgroundTransparency = 1
     ContentLbl.Text = Content
     ContentLbl.TextColor3 = Color3.fromRGB(220, 220, 220)
     ContentLbl.Font = Enum.Font.GothamMedium
-    ContentLbl.TextSize = 12
+    ContentLbl.TextSize = 11
     ContentLbl.TextXAlignment = 0
     ContentLbl.TextYAlignment = 0
     ContentLbl.TextWrapped = true
     ContentLbl.ZIndex = 3
 
-    -- Nút X
-    local CloseX = Instance.new("TextButton", Notif)
-    CloseX.Size = UDim2.new(0, 18, 0, 18)
-    CloseX.Position = UDim2.new(1, -24, 0, 6)
-    CloseX.BackgroundTransparency = 1
-    CloseX.Text = "×"
-    CloseX.TextColor3 = Color3.fromRGB(180, 180, 180)
-    CloseX.Font = Enum.Font.GothamBold
-    CloseX.TextSize = 16
-    CloseX.AutoButtonColor = false
-    CloseX.ZIndex = 4
+    -- Bấm vào notif để tắt (thay cho nút X)
+    local ClickDismiss = Instance.new("TextButton", Notif)
+    ClickDismiss.Size = UDim2.new(1, 0, 1, 0)
+    ClickDismiss.BackgroundTransparency = 1
+    ClickDismiss.Text = ""
+    ClickDismiss.AutoButtonColor = false
+    ClickDismiss.ZIndex = 5
 
     Notif.Parent = Container
 
@@ -154,12 +148,11 @@ function Library:Notify(config)
         TweenSvc:Create(AccentBar, TweenInfo.new(0.22), {BackgroundTransparency = 1}):Play()
         TweenSvc:Create(TitleLbl, TweenInfo.new(0.22), {TextTransparency = 1}):Play()
         TweenSvc:Create(ContentLbl, TweenInfo.new(0.22), {TextTransparency = 1}):Play()
-        TweenSvc:Create(CloseX, TweenInfo.new(0.22), {TextTransparency = 1}):Play()
         task.wait(0.22)
         if Notif and Notif.Parent then Notif:Destroy() end
     end
 
-    CloseX.MouseButton1Click:Connect(Dismiss)
+    ClickDismiss.MouseButton1Click:Connect(Dismiss)
 
     if Duration > 0 then
         dismissThread = task.delay(Duration, Dismiss)
@@ -179,10 +172,10 @@ function Library:CreateWindow(config)
     windowSlot = windowSlot + 1
     local slot = windowSlot
 
-    local TweenService = game:GetService("TweenService")
-    local CoreGui      = GetCoreGui()
+    local TweenService     = game:GetService("TweenService")
+    local UserInputService = game:GetService("UserInputService")
+    local CoreGui          = GetCoreGui()
 
-    -- Offset cho nhiều menu
     local OFF_X = (slot - 1) * 40
     local OFF_Y = (slot - 1) * 40
 
@@ -191,14 +184,13 @@ function Library:CreateWindow(config)
     local FULL_POS   = UDim2.new(0.5, -230 + OFF_X, 0.5, -160 + OFF_Y)
     local CENTER_POS = UDim2.new(0.5, 0 + OFF_X, 0.5, 0 + OFF_Y)
 
-    -- ScreenGui riêng cho từng menu
     local ScreenGui = Instance.new("ScreenGui")
     ScreenGui.Name = "CyberVibe_Hub_" .. slot .. "_" .. math.random(1000, 9999)
     ScreenGui.ResetOnSpawn = false
     ScreenGui.DisplayOrder = 100 + slot
     ScreenGui.Parent = CoreGui
 
-    -- Mobile Toggle
+    -- Mobile Toggle (icon lấp đầy bằng Crop)
     local MobileToggle = Instance.new("TextButton", ScreenGui)
     MobileToggle.Size = UDim2.new(0, 65, 0, 65)
     MobileToggle.Position = UDim2.new(0, 15, 0, 15 + (slot - 1) * 75)
@@ -214,10 +206,12 @@ function Library:CreateWindow(config)
 
     local ToggleIcon = Instance.new("ImageLabel", MobileToggle)
     ToggleIcon.Size = UDim2.new(1, 0, 1, 0)
+    ToggleIcon.Position = UDim2.new(0, 0, 0, 0)
     ToggleIcon.BackgroundTransparency = 1
     ToggleIcon.Image = "rbxassetid://134586557209278"
     ToggleIcon.ImageColor3 = Color3.fromRGB(255, 255, 255)
-    ToggleIcon.ScaleType = Enum.ScaleType.Fit
+    ToggleIcon.ScaleType = Enum.ScaleType.Crop   -- FIX: icon to rõ
+    ToggleIcon.ZIndex = 2
     Instance.new("UICorner", ToggleIcon).CornerRadius = UDim.new(1, 0)
 
     -- Main Frame
@@ -236,7 +230,6 @@ function Library:CreateWindow(config)
     MainStroke.Thickness = 1.5
     Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 10)
 
-    -- Control buttons
     local CloseBtn = Instance.new("TextButton", MainFrame)
     CloseBtn.Size = UDim2.new(0, 28, 0, 28); CloseBtn.Position = UDim2.new(1, -38, 0, 10)
     CloseBtn.BackgroundColor3 = Color3.fromRGB(250, 60, 60); CloseBtn.Text = "X"
@@ -261,7 +254,6 @@ function Library:CreateWindow(config)
     DestroyBtn.ZIndex = 3
     Instance.new("UICorner", DestroyBtn).CornerRadius = UDim.new(0, 6)
 
-    -- Title
     local TitleLabel = Instance.new("TextLabel", MainFrame)
     TitleLabel.Size = UDim2.new(1, -50, 0, 40); TitleLabel.Position = UDim2.new(0, 15, 0, 0)
     TitleLabel.BackgroundTransparency = 1
@@ -281,7 +273,6 @@ function Library:CreateWindow(config)
         end
     end)
 
-    -- Containers
     local TabContainer = Instance.new("Frame", MainFrame)
     TabContainer.Size = UDim2.new(0, 110, 1, -55); TabContainer.Position = UDim2.new(0, 12, 0, 45)
     TabContainer.BackgroundTransparency = 1
@@ -293,7 +284,7 @@ function Library:CreateWindow(config)
     ContentContainer.BackgroundTransparency = 1
     ContentContainer.ZIndex = 3
 
-    local isMinimized = false
+    local isMinimized  = false
     local isMenuVisible = false
 
     local function OpenMenu()
@@ -320,7 +311,9 @@ function Library:CreateWindow(config)
             BackgroundTransparency = 0
         }):Play()
 
-        task.wait(0.1)
+        task.wait(0.5)
+        MainFrame.ClipsDescendants = false  -- FIX: để dropdown không bị cắt
+
         local glowFrame = Instance.new("Frame", MainFrame)
         glowFrame.Size = UDim2.new(1, 10, 1, 10)
         glowFrame.Position = UDim2.new(0, -5, 0, -5)
@@ -328,7 +321,6 @@ function Library:CreateWindow(config)
         glowFrame.BackgroundTransparency = 0.8
         glowFrame.ZIndex = 0
         Instance.new("UICorner", glowFrame).CornerRadius = UDim.new(0, 12)
-
         TweenService:Create(glowFrame, TweenInfo.new(0.5), {
             BackgroundTransparency = 1,
             Size = UDim2.new(1, 20, 1, 20),
@@ -345,6 +337,7 @@ function Library:CreateWindow(config)
         MinimizeBtn.Text = "–"
         TabContainer.Visible = true
         ContentContainer.Visible = true
+        MainFrame.ClipsDescendants = true
 
         TweenService:Create(MainFrame, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.In), {
             Size = UDim2.new(0, 0, 0, 0),
@@ -383,15 +376,12 @@ function Library:CreateWindow(config)
         end
     end)
 
-    ----------------------------------------------------------------
-    -- FIX: NÚT "D" — Dialog đặt trong ScreenGui riêng, ZIndex cao
-    ----------------------------------------------------------------
+    -- Destroy dialog (fixed)
     local activeConfirmGui = nil
 
     DestroyBtn.MouseButton1Click:Connect(function()
         if activeConfirmGui and activeConfirmGui.Parent then return end
 
-        -- ScreenGui riêng, DisplayOrder rất cao để luôn nổi trên mọi thứ
         local ConfirmGui = Instance.new("ScreenGui")
         ConfirmGui.Name = "CyberVibe_Confirm_" .. math.random(10000, 99999)
         ConfirmGui.ResetOnSpawn = false
@@ -400,7 +390,6 @@ function Library:CreateWindow(config)
         ConfirmGui.Parent = GetCoreGui()
         activeConfirmGui = ConfirmGui
 
-        -- Overlay làm mờ nền
         local Overlay = Instance.new("Frame", ConfirmGui)
         Overlay.Size = UDim2.new(1, 0, 1, 0)
         Overlay.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
@@ -421,7 +410,6 @@ function Library:CreateWindow(config)
         ConfirmStroke.Thickness = 1.5
         ConfirmStroke.ZIndex = 101
 
-        -- Title
         local Title = Instance.new("TextLabel", ConfirmFrame)
         Title.Size = UDim2.new(1, 0, 0, 35)
         Title.BackgroundTransparency = 1
@@ -431,7 +419,6 @@ function Library:CreateWindow(config)
         Title.TextSize = 16
         Title.ZIndex = 102
 
-        -- Nội dung
         local TextLabel = Instance.new("TextLabel", ConfirmFrame)
         TextLabel.Size = UDim2.new(1, -20, 0, 50)
         TextLabel.Position = UDim2.new(0, 10, 0, 40)
@@ -443,7 +430,6 @@ function Library:CreateWindow(config)
         TextLabel.TextWrapped = true
         TextLabel.ZIndex = 102
 
-        -- Nút xác nhận
         local YesBtn = Instance.new("TextButton", ConfirmFrame)
         YesBtn.Size = UDim2.new(0, 120, 0, 34)
         YesBtn.Position = UDim2.new(0.5, -125, 1, -50)
@@ -455,7 +441,6 @@ function Library:CreateWindow(config)
         YesBtn.ZIndex = 102
         Instance.new("UICorner", YesBtn).CornerRadius = UDim.new(0, 6)
 
-        -- Nút hủy
         local NoBtn = Instance.new("TextButton", ConfirmFrame)
         NoBtn.Size = UDim2.new(0, 120, 0, 34)
         NoBtn.Position = UDim2.new(0.5, 5, 1, -50)
@@ -468,12 +453,8 @@ function Library:CreateWindow(config)
         Instance.new("UICorner", NoBtn).CornerRadius = UDim.new(0, 6)
 
         local function CleanupConfirm()
-            if ConfirmGui and ConfirmGui.Parent then
-                ConfirmGui:Destroy()
-            end
-            if activeConfirmGui == ConfirmGui then
-                activeConfirmGui = nil
-            end
+            if ConfirmGui and ConfirmGui.Parent then ConfirmGui:Destroy() end
+            if activeConfirmGui == ConfirmGui then activeConfirmGui = nil end
         end
 
         NoBtn.MouseButton1Click:Connect(CleanupConfirm)
@@ -495,20 +476,14 @@ function Library:CreateWindow(config)
         end)
     end)
 
-    -- Tự mở menu
     task.wait(0.1)
     OpenMenu()
 
     local Window = { Pages = {}, TabButtons = {} }
 
-    function Window:Notify(cfg)
-        return Library:Notify(cfg)
-    end
-
+    function Window:Notify(cfg)  return Library:Notify(cfg) end
     function Window:Destroy()
-        if ScreenGui and ScreenGui.Parent then
-            ScreenGui:Destroy()
-        end
+        if ScreenGui and ScreenGui.Parent then ScreenGui:Destroy() end
     end
 
     function Window:CreateTab(name)
@@ -770,6 +745,130 @@ function Library:CreateWindow(config)
                     if callback then callback(optionName) end
                 end)
             end
+        end
+
+        function Tab:AddSlider(labelText, minValue, maxValue, defaultValue, callback, decimals)
+            minValue = tonumber(minValue) or 0
+            maxValue = tonumber(maxValue) or 100
+            if maxValue <= minValue then maxValue = minValue + 1 end
+            decimals = math.max(0, math.floor(tonumber(decimals) or 0))
+            local currentValue = math.clamp(tonumber(defaultValue) or minValue, minValue, maxValue)
+
+            local SliderFrame = Instance.new("Frame", Page)
+            SliderFrame.Size = UDim2.new(1, 0, 0, 46)
+            SliderFrame.BackgroundTransparency = 1
+            SliderFrame.ZIndex = 4
+
+            local Label = Instance.new("TextLabel", SliderFrame)
+            Label.Size = UDim2.new(0.7, 0, 0, 16)
+            Label.Position = UDim2.new(0, 0, 0, 0)
+            Label.BackgroundTransparency = 1
+            Label.Text = labelText
+            Label.TextColor3 = Color3.fromRGB(230, 230, 230)
+            Label.Font = Enum.Font.GothamMedium
+            Label.TextSize = 13
+            Label.TextXAlignment = 0
+            Label.ZIndex = 4
+
+            local ValueLabel = Instance.new("TextLabel", SliderFrame)
+            ValueLabel.Size = UDim2.new(0, 80, 0, 16)
+            ValueLabel.Position = UDim2.new(1, -80, 0, 0)
+            ValueLabel.BackgroundTransparency = 1
+            ValueLabel.Text = string.format("%."..decimals.."f", currentValue)
+            ValueLabel.TextColor3 = Color3.fromRGB(0, 212, 255)
+            ValueLabel.Font = Enum.Font.GothamBold
+            ValueLabel.TextSize = 12
+            ValueLabel.TextXAlignment = 1
+            ValueLabel.ZIndex = 4
+
+            local BarBG = Instance.new("Frame", SliderFrame)
+            BarBG.Size = UDim2.new(1, 0, 0, 6)
+            BarBG.Position = UDim2.new(0, 0, 0, 28)
+            BarBG.BackgroundColor3 = Color3.fromRGB(45, 48, 56)
+            BarBG.BorderSizePixel = 0
+            BarBG.ZIndex = 4
+            Instance.new("UICorner", BarBG).CornerRadius = UDim.new(1, 0)
+
+            local initPct = (currentValue - minValue) / (maxValue - minValue)
+
+            local Fill = Instance.new("Frame", BarBG)
+            Fill.Size = UDim2.new(initPct, 0, 1, 0)
+            Fill.BackgroundColor3 = Color3.fromRGB(0, 168, 204)
+            Fill.BorderSizePixel = 0
+            Fill.ZIndex = 5
+            Instance.new("UICorner", Fill).CornerRadius = UDim.new(1, 0)
+
+            local Knob = Instance.new("Frame", BarBG)
+            Knob.Size = UDim2.new(0, 14, 0, 14)
+            Knob.Position = UDim2.new(initPct, -7, 0.5, -7)
+            Knob.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+            Knob.BorderSizePixel = 0
+            Knob.ZIndex = 6
+            Instance.new("UICorner", Knob).CornerRadius = UDim.new(1, 0)
+
+            local InputBtn = Instance.new("TextButton", SliderFrame)
+            InputBtn.Size = UDim2.new(1, 0, 0, 22)
+            InputBtn.Position = UDim2.new(0, 0, 0, 20)
+            InputBtn.BackgroundTransparency = 1
+            InputBtn.Text = ""
+            InputBtn.AutoButtonColor = false
+            InputBtn.ZIndex = 7
+
+            local dragging = false
+
+            local function ApplyValue(v, animate)
+                v = math.clamp(v, minValue, maxValue)
+                if decimals == 0 then v = math.floor(v + 0.5) end
+                currentValue = v
+                ValueLabel.Text = string.format("%."..decimals.."f", v)
+                local pct = (v - minValue) / (maxValue - minValue)
+                if animate then
+                    TweenService:Create(Fill, TweenInfo.new(0.05), {Size = UDim2.new(pct, 0, 1, 0)}):Play()
+                    TweenService:Create(Knob, TweenInfo.new(0.05), {Position = UDim2.new(pct, -7, 0.5, -7)}):Play()
+                else
+                    Fill.Size = UDim2.new(pct, 0, 1, 0)
+                    Knob.Position = UDim2.new(pct, -7, 0.5, -7)
+                end
+                if callback then pcall(callback, v) end
+            end
+
+            local function UpdateFromX(x)
+                local barAbs = BarBG.AbsolutePosition.X
+                local barW = BarBG.AbsoluteSize.X
+                if barW <= 0 then return end
+                local pct = math.clamp((x - barAbs) / barW, 0, 1)
+                ApplyValue(minValue + (maxValue - minValue) * pct, true)
+            end
+
+            InputBtn.InputBegan:Connect(function(input)
+                if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                    dragging = true
+                    UpdateFromX(input.Position.X)
+                end
+            end)
+
+            UserInputService.InputChanged:Connect(function(input)
+                if not dragging then return end
+                if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+                    UpdateFromX(input.Position.X)
+                end
+            end)
+
+            UserInputService.InputEnded:Connect(function(input)
+                if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                    dragging = false
+                end
+            end)
+
+            local SliderObj = {}
+            function SliderObj:Set(v)
+                ApplyValue(tonumber(v) or minValue, false)
+            end
+            function SliderObj:Get()
+                return currentValue
+            end
+
+            return SliderObj
         end
 
         function Tab:GetPageContainer()
