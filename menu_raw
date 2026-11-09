@@ -1,4 +1,3 @@
-
 local Library = {}
 
 local windowSlot = 0
@@ -37,6 +36,67 @@ local function EnsureNotifyGui()
     return NotifyGui
 end
 
+local DEFAULT_SOUNDS = {
+    "rbxassetid://876939830",
+    "rbxassetid://6026984224",
+    "rbxassetid://4590657391",
+    "rbxassetid://9120386436"
+}
+
+local function NormalizeSoundId(id)
+    if type(id) == "number" then
+        return "rbxassetid://" .. tostring(id)
+    end
+    if type(id) == "string" and id ~= "" then
+        if id:match("^%d+$") then
+            return "rbxassetid://" .. id
+        end
+        return id
+    end
+    return nil
+end
+
+local function PlayNotifySound(customId)
+    task.spawn(function()
+        local SoundSvc = game:GetService("SoundService")
+        local ContentSvc = game:GetService("ContentProvider")
+
+        local ids = {}
+        local custom = NormalizeSoundId(customId)
+        if custom then table.insert(ids, custom) end
+        for _, id in ipairs(DEFAULT_SOUNDS) do
+            if id ~= custom then table.insert(ids, id) end
+        end
+
+        for _, id in ipairs(ids) do
+            local snd = Instance.new("Sound")
+            snd.Name = "CyberVibe_NotifySound"
+            snd.SoundId = id
+            snd.Volume = 0.6
+            snd.Looped = false
+            snd.Parent = SoundSvc
+
+            pcall(function() ContentSvc:PreloadAsync({snd}) end)
+
+            local waited = 0
+            while not snd.IsLoaded and waited < 2 do
+                task.wait(0.05)
+                waited = waited + 0.05
+            end
+
+            if snd.IsLoaded and snd.TimeLength > 0 then
+                snd:Play()
+                task.delay(snd.TimeLength + 1, function()
+                    if snd and snd.Parent then snd:Destroy() end
+                end)
+                return
+            end
+
+            snd:Destroy()
+        end
+    end)
+end
+
 function Library:Notify(config)
     config = config or {}
     local Title    = config.Title    or config.title    or "Thông Báo"
@@ -44,26 +104,20 @@ function Library:Notify(config)
     local Duration = config.Duration or config.duration or 4
     local Accent   = config.Color    or config.color    or Color3.fromRGB(0, 212, 255)
     local Silent   = config.Silent   or config.silent   or false
-    local SoundId  = config.SoundId  or config.soundId  or "rbxassetid://876939830"
+    local SoundId  = config.SoundId  or config.soundId
+
+    if type(Duration) ~= "number" or Duration <= 0 then Duration = 4 end
 
     local gui       = EnsureNotifyGui()
     local Container = gui:FindFirstChild("Container")
     local TweenSvc  = game:GetService("TweenService")
     local TextSvc   = game:GetService("TextService")
-    local SoundSvc  = game:GetService("SoundService")
 
     if not Silent then
         local now = tick()
         if now - lastNotifySound > 0.25 then
             lastNotifySound = now
-            local snd = Instance.new("Sound")
-            snd.SoundId = SoundId
-            snd.Volume  = 0.4
-            snd.Parent  = SoundSvc
-            pcall(function() SoundSvc:PlayLocalSound(snd) end)
-            task.delay(5, function()
-                if snd and snd.Parent then snd:Destroy() end
-            end)
+            PlayNotifySound(SoundId)
         end
     end
 
@@ -79,26 +133,38 @@ function Library:Notify(config)
             contentHeight = math.max(14, bounds.Y)
         end
     end
-    local totalHeight = math.max(42, 20 + contentHeight + 6)
+    local totalHeight = math.max(48, 20 + contentHeight + 14)
 
-    local Notif = Instance.new("Frame")
-    Notif.Size = UDim2.new(1, 0, 0, 0)
+    local Holder = Instance.new("Frame")
+    Holder.Name = "Holder"
+    Holder.Size = UDim2.new(1, 0, 0, 0)
+    Holder.BackgroundTransparency = 1
+    Holder.BorderSizePixel = 0
+    Holder.LayoutOrder = notifySlot
+    Holder.ClipsDescendants = false
+    Holder.Parent = Container
+
+    local Notif = Instance.new("Frame", Holder)
+    Notif.Name = "Notif"
+    Notif.Size = UDim2.new(1, 0, 0, totalHeight)
+    Notif.Position = UDim2.new(1, 380, 0, 0)
     Notif.BackgroundColor3 = Color3.fromRGB(25, 27, 34)
+    Notif.BackgroundTransparency = 1
     Notif.BorderSizePixel = 0
-    Notif.LayoutOrder = notifySlot
     Notif.ZIndex = 2
     Instance.new("UICorner", Notif).CornerRadius = UDim.new(0, 7)
 
     local Stroke = Instance.new("UIStroke", Notif)
     Stroke.Color = Accent
     Stroke.Thickness = 1.2
-    Stroke.Transparency = 0.35
+    Stroke.Transparency = 1
     Stroke.ZIndex = 3
 
     local AccentBar = Instance.new("Frame", Notif)
-    AccentBar.Size = UDim2.new(0, 3, 1, -8)
+    AccentBar.Size = UDim2.new(0, 3, 1, -16)
     AccentBar.Position = UDim2.new(0, 4, 0, 4)
     AccentBar.BackgroundColor3 = Accent
+    AccentBar.BackgroundTransparency = 1
     AccentBar.BorderSizePixel = 0
     AccentBar.ZIndex = 3
     Instance.new("UICorner", AccentBar).CornerRadius = UDim.new(1, 0)
@@ -109,9 +175,10 @@ function Library:Notify(config)
     TitleLbl.BackgroundTransparency = 1
     TitleLbl.Text = Title
     TitleLbl.TextColor3 = Accent
+    TitleLbl.TextTransparency = 1
     TitleLbl.Font = Enum.Font.GothamBold
     TitleLbl.TextSize = 12
-    TitleLbl.TextXAlignment = 0
+    TitleLbl.TextXAlignment = Enum.TextXAlignment.Left
     TitleLbl.ZIndex = 3
 
     local ContentLbl = Instance.new("TextLabel", Notif)
@@ -120,62 +187,80 @@ function Library:Notify(config)
     ContentLbl.BackgroundTransparency = 1
     ContentLbl.Text = Content
     ContentLbl.TextColor3 = Color3.fromRGB(220, 220, 220)
+    ContentLbl.TextTransparency = 1
     ContentLbl.Font = Enum.Font.GothamMedium
     ContentLbl.TextSize = 11
-    ContentLbl.TextXAlignment = 0
-    ContentLbl.TextYAlignment = 0
+    ContentLbl.TextXAlignment = Enum.TextXAlignment.Left
+    ContentLbl.TextYAlignment = Enum.TextYAlignment.Top
     ContentLbl.TextWrapped = true
     ContentLbl.ZIndex = 3
 
-    local ClickDismiss = Instance.new("TextButton", Notif)
-    ClickDismiss.Size = UDim2.new(1, 0, 1, 0)
-    ClickDismiss.BackgroundTransparency = 1
-    ClickDismiss.Text = ""
-    ClickDismiss.AutoButtonColor = false
-    ClickDismiss.ZIndex = 5
+    local BarTrack = Instance.new("Frame", Notif)
+    BarTrack.Size = UDim2.new(1, -20, 0, 3)
+    BarTrack.Position = UDim2.new(0, 10, 1, -7)
+    BarTrack.BackgroundColor3 = Color3.fromRGB(45, 48, 56)
+    BarTrack.BackgroundTransparency = 1
+    BarTrack.BorderSizePixel = 0
+    BarTrack.ZIndex = 3
+    Instance.new("UICorner", BarTrack).CornerRadius = UDim.new(1, 0)
 
-    Notif.Parent = Container
+    local BarFill = Instance.new("Frame", BarTrack)
+    BarFill.Size = UDim2.new(1, 0, 1, 0)
+    BarFill.BackgroundColor3 = Accent
+    BarFill.BackgroundTransparency = 1
+    BarFill.BorderSizePixel = 0
+    BarFill.ZIndex = 4
+    Instance.new("UICorner", BarFill).CornerRadius = UDim.new(1, 0)
 
-    TweenSvc:Create(Notif, TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
-        Size = UDim2.new(1, 0, 0, totalHeight)
-    }):Play()
+    local slideIn  = TweenInfo.new(0.55, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+    local fadeIn   = TweenInfo.new(0.4,  Enum.EasingStyle.Quad,  Enum.EasingDirection.Out)
+    local growInfo = TweenInfo.new(0.35, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
 
-    local dismissed   = false
-    local timerThread = nil
+    TweenSvc:Create(Holder, growInfo, {Size = UDim2.new(1, 0, 0, totalHeight)}):Play()
 
-    local function RunDismissAnimations()
-        TweenSvc:Create(Notif, TweenInfo.new(0.22, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
-            Size = UDim2.new(1, 0, 0, 0),
-            BackgroundTransparency = 1
-        }):Play()
-        TweenSvc:Create(Stroke,     TweenInfo.new(0.22), {Transparency = 1}):Play()
-        TweenSvc:Create(AccentBar,  TweenInfo.new(0.22), {BackgroundTransparency = 1}):Play()
-        TweenSvc:Create(TitleLbl,   TweenInfo.new(0.22), {TextTransparency = 1}):Play()
-        TweenSvc:Create(ContentLbl, TweenInfo.new(0.22), {TextTransparency = 1}):Play()
-        task.wait(0.22)
-        if Notif and Notif.Parent then Notif:Destroy() end
-    end
-
-    local function Dismiss(fromClick)
-        if dismissed then return end
-        dismissed = true
-        
-        if fromClick and timerThread then
-            pcall(task.cancel, timerThread)
-            timerThread = nil
-        end
-        RunDismissAnimations()
-    end
-
-    ClickDismiss.MouseButton1Click:Connect(function()
-        Dismiss(true)
+    task.delay(0.08, function()
+        if not Notif or not Notif.Parent then return end
+        TweenSvc:Create(Notif,       slideIn, {Position = UDim2.new(0, 0, 0, 0)}):Play()
+        TweenSvc:Create(Notif,       fadeIn,  {BackgroundTransparency = 0}):Play()
+        TweenSvc:Create(Stroke,      fadeIn,  {Transparency = 0.35}):Play()
+        TweenSvc:Create(AccentBar,   fadeIn,  {BackgroundTransparency = 0}):Play()
+        TweenSvc:Create(TitleLbl,    fadeIn,  {TextTransparency = 0}):Play()
+        TweenSvc:Create(ContentLbl,  fadeIn,  {TextTransparency = 0}):Play()
+        TweenSvc:Create(BarTrack,    fadeIn,  {BackgroundTransparency = 0.3}):Play()
+        TweenSvc:Create(BarFill,     fadeIn,  {BackgroundTransparency = 0}):Play()
     end)
 
-    if Duration > 0 then
-        timerThread = task.delay(Duration, function()
-            Dismiss(false)
-        end)
-    end
+    task.delay(0.55, function()
+        if not Notif or not Notif.Parent then return end
+        TweenSvc:Create(BarFill, TweenInfo.new(Duration, Enum.EasingStyle.Linear), {
+            Size = UDim2.new(0, 0, 1, 0)
+        }):Play()
+    end)
+
+    task.delay(0.55 + Duration, function()
+        if not Notif or not Notif.Parent then return end
+
+        local outInfo = TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.In)
+        local outFade = TweenInfo.new(0.3, Enum.EasingStyle.Quad,  Enum.EasingDirection.In)
+
+        TweenSvc:Create(Notif,       outInfo, {Position = UDim2.new(1, 380, 0, 0)}):Play()
+        TweenSvc:Create(Notif,       outFade, {BackgroundTransparency = 1}):Play()
+        TweenSvc:Create(Stroke,      outFade, {Transparency = 1}):Play()
+        TweenSvc:Create(AccentBar,   outFade, {BackgroundTransparency = 1}):Play()
+        TweenSvc:Create(TitleLbl,    outFade, {TextTransparency = 1}):Play()
+        TweenSvc:Create(ContentLbl,  outFade, {TextTransparency = 1}):Play()
+        TweenSvc:Create(BarTrack,    outFade, {BackgroundTransparency = 1}):Play()
+        TweenSvc:Create(BarFill,     outFade, {BackgroundTransparency = 1}):Play()
+
+        task.wait(0.35)
+        if not Holder or not Holder.Parent then return end
+        local collapse = TweenSvc:Create(Holder, TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
+            Size = UDim2.new(1, 0, 0, 0)
+        })
+        collapse:Play()
+        collapse.Completed:Wait()
+        if Holder and Holder.Parent then Holder:Destroy() end
+    end)
 
     return Notif
 end
@@ -216,22 +301,25 @@ function Library:CreateWindow(config)
     MobileToggle.ZIndex = 5
     MobileToggle.AutoButtonColor = false
     Instance.new("UICorner", MobileToggle).CornerRadius = UDim.new(1, 0)
-MobileToggle.ClipsDescendants = true   
+
     local ToggleStroke = Instance.new("UIStroke", MobileToggle)
     ToggleStroke.Thickness = 2
     ToggleStroke.Color = Color3.fromRGB(0, 212, 255)
 
     local ToggleIcon = Instance.new("ImageLabel", MobileToggle)
-    ToggleIcon.Size = UDim2.new(1.25, 0, 1.25, 0)          
-    ToggleIcon.Position = UDim2.new(-0.125, 0, -0.125, 0)  
+    ToggleIcon.Name = "ToggleIcon"
+    ToggleIcon.Size = UDim2.new(1, 0, 1, 0)
+    ToggleIcon.Position = UDim2.new(0, 0, 0, 0)
     ToggleIcon.BackgroundTransparency = 1
+    ToggleIcon.BorderSizePixel = 0
     ToggleIcon.Image = "rbxassetid://134586557209278"
     ToggleIcon.ImageColor3 = Color3.fromRGB(255, 255, 255)
-    ToggleIcon.ScaleType = Enum.ScaleType.Stretch           
-    ToggleIcon.ZIndex = 2
+    ToggleIcon.ImageTransparency = 0
+    ToggleIcon.ScaleType = Enum.ScaleType.Crop
+    ToggleIcon.Active = false
+    ToggleIcon.ZIndex = 6
     Instance.new("UICorner", ToggleIcon).CornerRadius = UDim.new(1, 0)
 
-    -- Main Frame
     local MainFrame = Instance.new("Frame", ScreenGui)
     MainFrame.Size = FULL_SIZE
     MainFrame.Position = FULL_POS
@@ -393,7 +481,6 @@ MobileToggle.ClipsDescendants = true
         end
     end)
 
-    -- Destroy dialog
     local activeConfirmGui = nil
 
     DestroyBtn.MouseButton1Click:Connect(function()
