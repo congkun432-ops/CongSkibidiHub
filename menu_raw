@@ -1,5 +1,5 @@
 --═══════════════════════════════════════════════════════════════
---  [[ CYBERVIBE UI LIBRARY MODULE - v2.1 FINAL ]]
+--  [[ CYBERVIBE UI LIBRARY MODULE - v2.2 FINAL ]]
 --═══════════════════════════════════════════════════════════════
 local Library = {}
 
@@ -9,6 +9,7 @@ local Library = {}
 local windowSlot = 0
 local notifySlot = 0
 local NotifyGui  = nil
+local lastNotifySound = 0   -- debounce âm thanh thông báo
 
 local function GetCoreGui()
     local ok, cg = pcall(function() return game:GetService("CoreGui") end)
@@ -50,11 +51,30 @@ function Library:Notify(config)
     local Content  = config.Content  or config.content  or config.Message or config.message or ""
     local Duration = config.Duration or config.duration or 4
     local Accent   = config.Color    or config.color    or Color3.fromRGB(0, 212, 255)
+    local Silent   = config.Silent   or config.silent   or false
+    local SoundId  = config.SoundId  or config.soundId  or "rbxassetid://876939830"
 
     local gui       = EnsureNotifyGui()
     local Container = gui:FindFirstChild("Container")
     local TweenSvc  = game:GetService("TweenService")
     local TextSvc   = game:GetService("TextService")
+    local SoundSvc  = game:GetService("SoundService")
+
+    -- 🔊 Phát âm thanh thông báo (debounce 0.25s tránh chồng tiếng)
+    if not Silent then
+        local now = tick()
+        if now - lastNotifySound > 0.25 then
+            lastNotifySound = now
+            local snd = Instance.new("Sound")
+            snd.SoundId = SoundId
+            snd.Volume  = 0.4
+            snd.Parent  = SoundSvc
+            pcall(function() SoundSvc:PlayLocalSound(snd) end)
+            task.delay(5, function()
+                if snd and snd.Parent then snd:Destroy() end
+            end)
+        end
+    end
 
     notifySlot = notifySlot + 1
 
@@ -116,7 +136,6 @@ function Library:Notify(config)
     ContentLbl.TextWrapped = true
     ContentLbl.ZIndex = 3
 
-    -- Bấm vào notif để tắt (thay cho nút X)
     local ClickDismiss = Instance.new("TextButton", Notif)
     ClickDismiss.Size = UDim2.new(1, 0, 1, 0)
     ClickDismiss.BackgroundTransparency = 1
@@ -130,32 +149,44 @@ function Library:Notify(config)
         Size = UDim2.new(1, 0, 0, totalHeight)
     }):Play()
 
-    local dismissed = false
-    local dismissThread = nil
+    -- ═══════════════════════════════════════════════════════════
+    -- DISMISS LOGIC — ĐÃ FIX: không cancel chính thread timer
+    -- ═══════════════════════════════════════════════════════════
+    local dismissed   = false
+    local timerThread = nil
 
-    local function Dismiss()
-        if dismissed then return end
-        dismissed = true
-        if dismissThread then
-            task.cancel(dismissThread)
-            dismissThread = nil
-        end
+    local function RunDismissAnimations()
         TweenSvc:Create(Notif, TweenInfo.new(0.22, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
             Size = UDim2.new(1, 0, 0, 0),
             BackgroundTransparency = 1
         }):Play()
-        TweenSvc:Create(Stroke, TweenInfo.new(0.22), {Transparency = 1}):Play()
-        TweenSvc:Create(AccentBar, TweenInfo.new(0.22), {BackgroundTransparency = 1}):Play()
-        TweenSvc:Create(TitleLbl, TweenInfo.new(0.22), {TextTransparency = 1}):Play()
+        TweenSvc:Create(Stroke,     TweenInfo.new(0.22), {Transparency = 1}):Play()
+        TweenSvc:Create(AccentBar,  TweenInfo.new(0.22), {BackgroundTransparency = 1}):Play()
+        TweenSvc:Create(TitleLbl,   TweenInfo.new(0.22), {TextTransparency = 1}):Play()
         TweenSvc:Create(ContentLbl, TweenInfo.new(0.22), {TextTransparency = 1}):Play()
         task.wait(0.22)
         if Notif and Notif.Parent then Notif:Destroy() end
     end
 
-    ClickDismiss.MouseButton1Click:Connect(Dismiss)
+    local function Dismiss(fromClick)
+        if dismissed then return end
+        dismissed = true
+        -- Chỉ cancel timer khi USER bấm; nếu timer tự fire thì KHÔNG cancel
+        if fromClick and timerThread then
+            pcall(task.cancel, timerThread)
+            timerThread = nil
+        end
+        RunDismissAnimations()
+    end
+
+    ClickDismiss.MouseButton1Click:Connect(function()
+        Dismiss(true)
+    end)
 
     if Duration > 0 then
-        dismissThread = task.delay(Duration, Dismiss)
+        timerThread = task.delay(Duration, function()
+            Dismiss(false)
+        end)
     end
 
     return Notif
@@ -190,7 +221,10 @@ function Library:CreateWindow(config)
     ScreenGui.DisplayOrder = 100 + slot
     ScreenGui.Parent = CoreGui
 
-    -- Mobile Toggle (icon lấp đầy bằng Crop)
+    -- ═══════════════════════════════════════════════════════════
+    -- MOBILE TOGGLE (icon menu nhỏ)
+    -- FIX: ToggleIcon ZIndex CAO HƠN MobileToggle để không bị chìm
+    -- ═══════════════════════════════════════════════════════════
     local MobileToggle = Instance.new("TextButton", ScreenGui)
     MobileToggle.Size = UDim2.new(0, 65, 0, 65)
     MobileToggle.Position = UDim2.new(0, 15, 0, 15 + (slot - 1) * 75)
@@ -199,19 +233,22 @@ function Library:CreateWindow(config)
     MobileToggle.Draggable = true
     MobileToggle.Visible = true
     MobileToggle.ZIndex = 5
+    MobileToggle.AutoButtonColor = false
     Instance.new("UICorner", MobileToggle).CornerRadius = UDim.new(1, 0)
 
     local ToggleStroke = Instance.new("UIStroke", MobileToggle)
     ToggleStroke.Thickness = 2
+    ToggleStroke.Color = Color3.fromRGB(0, 212, 255)
 
     local ToggleIcon = Instance.new("ImageLabel", MobileToggle)
-    ToggleIcon.Size = UDim2.new(1, 0, 1, 0)
-    ToggleIcon.Position = UDim2.new(0, 0, 0, 0)
+    ToggleIcon.Size = UDim2.new(1, -10, 1, -10)       -- chừa padding nhẹ
+    ToggleIcon.Position = UDim2.new(0, 5, 0, 5)
     ToggleIcon.BackgroundTransparency = 1
     ToggleIcon.Image = "rbxassetid://134586557209278"
     ToggleIcon.ImageColor3 = Color3.fromRGB(255, 255, 255)
-    ToggleIcon.ScaleType = Enum.ScaleType.Crop   -- FIX: icon to rõ
-    ToggleIcon.ZIndex = 2
+    ToggleIcon.ImageTransparency = 0
+    ToggleIcon.ScaleType = Enum.ScaleType.Fit
+    ToggleIcon.ZIndex = 6                             -- FIX: > parent (5) để nổi lên trên
     Instance.new("UICorner", ToggleIcon).CornerRadius = UDim.new(1, 0)
 
     -- Main Frame
@@ -284,7 +321,7 @@ function Library:CreateWindow(config)
     ContentContainer.BackgroundTransparency = 1
     ContentContainer.ZIndex = 3
 
-    local isMinimized  = false
+    local isMinimized   = false
     local isMenuVisible = false
 
     local function OpenMenu()
@@ -312,7 +349,7 @@ function Library:CreateWindow(config)
         }):Play()
 
         task.wait(0.5)
-        MainFrame.ClipsDescendants = false  -- FIX: để dropdown không bị cắt
+        MainFrame.ClipsDescendants = false
 
         local glowFrame = Instance.new("Frame", MainFrame)
         glowFrame.Size = UDim2.new(1, 10, 1, 10)
@@ -376,7 +413,7 @@ function Library:CreateWindow(config)
         end
     end)
 
-    -- Destroy dialog (fixed)
+    -- Destroy dialog
     local activeConfirmGui = nil
 
     DestroyBtn.MouseButton1Click:Connect(function()
@@ -481,7 +518,7 @@ function Library:CreateWindow(config)
 
     local Window = { Pages = {}, TabButtons = {} }
 
-    function Window:Notify(cfg)  return Library:Notify(cfg) end
+    function Window:Notify(cfg) return Library:Notify(cfg) end
     function Window:Destroy()
         if ScreenGui and ScreenGui.Parent then ScreenGui:Destroy() end
     end
