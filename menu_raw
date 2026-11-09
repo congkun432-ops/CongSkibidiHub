@@ -1,15 +1,10 @@
---═══════════════════════════════════════════════════════════════
---  [[ CYBERVIBE UI LIBRARY MODULE - v2.2 FINAL ]]
---═══════════════════════════════════════════════════════════════
+
 local Library = {}
 
---------------------------------------------------------------------
--- HELPERS
---------------------------------------------------------------------
 local windowSlot = 0
 local notifySlot = 0
 local NotifyGui  = nil
-local lastNotifySound = 0   -- debounce âm thanh thông báo
+local lastNotifySound = 0 
 
 local function GetCoreGui()
     local ok, cg = pcall(function() return game:GetService("CoreGui") end)
@@ -17,9 +12,6 @@ local function GetCoreGui()
     return game:GetService("Players").LocalPlayer:WaitForChild("PlayerGui")
 end
 
---------------------------------------------------------------------
--- CUSTOM NOTIFICATION SYSTEM
---------------------------------------------------------------------
 local function EnsureNotifyGui()
     local CoreGui = GetCoreGui()
     if NotifyGui and NotifyGui.Parent then return NotifyGui end
@@ -60,7 +52,6 @@ function Library:Notify(config)
     local TextSvc   = game:GetService("TextService")
     local SoundSvc  = game:GetService("SoundService")
 
-    -- 🔊 Phát âm thanh thông báo (debounce 0.25s tránh chồng tiếng)
     if not Silent then
         local now = tick()
         if now - lastNotifySound > 0.25 then
@@ -149,9 +140,6 @@ function Library:Notify(config)
         Size = UDim2.new(1, 0, 0, totalHeight)
     }):Play()
 
-    -- ═══════════════════════════════════════════════════════════
-    -- DISMISS LOGIC — ĐÃ FIX: không cancel chính thread timer
-    -- ═══════════════════════════════════════════════════════════
     local dismissed   = false
     local timerThread = nil
 
@@ -171,7 +159,7 @@ function Library:Notify(config)
     local function Dismiss(fromClick)
         if dismissed then return end
         dismissed = true
-        -- Chỉ cancel timer khi USER bấm; nếu timer tự fire thì KHÔNG cancel
+        
         if fromClick and timerThread then
             pcall(task.cancel, timerThread)
             timerThread = nil
@@ -192,9 +180,6 @@ function Library:Notify(config)
     return Notif
 end
 
---------------------------------------------------------------------
--- CREATE WINDOW
---------------------------------------------------------------------
 function Library:CreateWindow(config)
     config = config or {}
     local HubName    = config.HubName    or "Setchauphi"
@@ -221,10 +206,6 @@ function Library:CreateWindow(config)
     ScreenGui.DisplayOrder = 100 + slot
     ScreenGui.Parent = CoreGui
 
-    -- ═══════════════════════════════════════════════════════════
-    -- MOBILE TOGGLE (icon menu nhỏ)
-    -- FIX: ToggleIcon ZIndex CAO HƠN MobileToggle để không bị chìm
-    -- ═══════════════════════════════════════════════════════════
     local MobileToggle = Instance.new("TextButton", ScreenGui)
     MobileToggle.Size = UDim2.new(0, 65, 0, 65)
     MobileToggle.Position = UDim2.new(0, 15, 0, 15 + (slot - 1) * 75)
@@ -235,20 +216,19 @@ function Library:CreateWindow(config)
     MobileToggle.ZIndex = 5
     MobileToggle.AutoButtonColor = false
     Instance.new("UICorner", MobileToggle).CornerRadius = UDim.new(1, 0)
-
+MobileToggle.ClipsDescendants = true   
     local ToggleStroke = Instance.new("UIStroke", MobileToggle)
     ToggleStroke.Thickness = 2
     ToggleStroke.Color = Color3.fromRGB(0, 212, 255)
 
     local ToggleIcon = Instance.new("ImageLabel", MobileToggle)
-    ToggleIcon.Size = UDim2.new(1, -10, 1, -10)       -- chừa padding nhẹ
-    ToggleIcon.Position = UDim2.new(0, 5, 0, 5)
+    ToggleIcon.Size = UDim2.new(1.25, 0, 1.25, 0)          
+    ToggleIcon.Position = UDim2.new(-0.125, 0, -0.125, 0)  
     ToggleIcon.BackgroundTransparency = 1
     ToggleIcon.Image = "rbxassetid://134586557209278"
     ToggleIcon.ImageColor3 = Color3.fromRGB(255, 255, 255)
-    ToggleIcon.ImageTransparency = 0
-    ToggleIcon.ScaleType = Enum.ScaleType.Fit
-    ToggleIcon.ZIndex = 6                             -- FIX: > parent (5) để nổi lên trên
+    ToggleIcon.ScaleType = Enum.ScaleType.Stretch           
+    ToggleIcon.ZIndex = 2
     Instance.new("UICorner", ToggleIcon).CornerRadius = UDim.new(1, 0)
 
     -- Main Frame
