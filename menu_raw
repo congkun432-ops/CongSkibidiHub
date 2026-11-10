@@ -188,8 +188,8 @@ local function EnsureNotifyGui()
 
     local Container = New("Frame", {
         Name = "Container",
-        Size = UDim2.new(0, 340, 0, 0),
-        Position = UDim2.new(1, -355, 0, 50),
+        Size = UDim2.new(0, 290, 0, 0),
+        Position = UDim2.new(1, -305, 0, 45),
         BackgroundTransparency = 1
     }, NotifyGui)
 
@@ -236,7 +236,7 @@ function Library:Notify(config)
 
     notifySlot = notifySlot + 1
 
-    local TEXT_W = 310
+    local TEXT_W = 262
     local contentHeight = 14
     if #Content > 0 then
         local ok, bounds = pcall(function()
@@ -246,7 +246,7 @@ function Library:Notify(config)
             contentHeight = math.max(14, bounds.Y)
         end
     end
-    local totalHeight = math.max(48, 20 + contentHeight + 14)
+    local totalHeight = math.max(40, 19 + contentHeight + 11)
 
     local Holder = New("Frame", {
         Name = "Holder",
@@ -259,7 +259,7 @@ function Library:Notify(config)
     local Notif = New("Frame", {
         Name = "Notif",
         Size = UDim2.new(1, 0, 0, totalHeight),
-        Position = UDim2.new(1, 380, 0, 0),
+        Position = UDim2.new(1, 340, 0, 0),
         BackgroundColor3 = BG_PANEL,
         BackgroundTransparency = 1,
         ZIndex = 2
@@ -346,7 +346,7 @@ function Library:Notify(config)
             local outInfo = TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.In)
             local outFade = TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
 
-            Tween(Notif, outInfo, { Position = UDim2.new(1, 380, 0, 0) })
+            Tween(Notif, outInfo, { Position = UDim2.new(1, 340, 0, 0) })
             Tween(Notif, outFade, { BackgroundTransparency = 1 })
             Tween(NotifStroke, outFade, { Transparency = 1 })
             Tween(AccentBar, outFade, { BackgroundTransparency = 1 })
@@ -470,8 +470,6 @@ function Library:CreateWindow(config)
     }, ScreenGui)
     Corner(MobileToggle, UDim.new(1, 0))
 
-    local ToggleStroke = Stroke(MobileToggle, ACCENT, 2)
-
     local ToggleIcon = New("ImageLabel", {
         Name = "ToggleIcon",
         Size = UDim2.new(1, 0, 1, 0),
@@ -545,7 +543,6 @@ function Library:CreateWindow(config)
         if rainbowAcc < 0.03 then return end
         rainbowAcc = 0
         local rainbow = Color3.fromHSV((tick() % 6) / 6, 0.7, 1)
-        ToggleStroke.Color = rainbow
         if MainFrame.Visible then
             MainStroke.Color = rainbow
             TitleLabel.TextColor3 = rainbow
@@ -1326,10 +1323,10 @@ function Library:CreateWindow(config)
 
             local currentValue = math.clamp(Round(tonumber(defaultValue) or minValue), minValue, maxValue)
 
-            local Row = MakeRow(46)
+            local Row = MakeRow(50)
 
             New("TextLabel", {
-                Size = UDim2.new(0.7, 0, 0, 16),
+                Size = UDim2.new(1, -70, 0, 20),
                 BackgroundTransparency = 1,
                 Text = labelText,
                 TextColor3 = TEXT_MAIN,
@@ -1340,21 +1337,36 @@ function Library:CreateWindow(config)
                 ZIndex = 4
             }, Row)
 
+            local ValuePill = New("Frame", {
+                AnchorPoint = Vector2.new(1, 0),
+                Size = UDim2.new(0, 0, 0, 20),
+                Position = UDim2.new(1, 0, 0, 0),
+                AutomaticSize = Enum.AutomaticSize.X,
+                BackgroundColor3 = BG_CONTROL,
+                ZIndex = 4
+            }, Row)
+            Corner(ValuePill, UDim.new(0, 6))
+            Stroke(ValuePill, STROKE_COL, 1)
+            New("UISizeConstraint", { MinSize = Vector2.new(44, 20) }, ValuePill)
+            New("UIPadding", {
+                PaddingLeft = UDim.new(0, 8),
+                PaddingRight = UDim.new(0, 8)
+            }, ValuePill)
+
             local ValueLabel = New("TextLabel", {
-                Size = UDim2.new(0, 80, 0, 16),
-                Position = UDim2.new(1, -80, 0, 0),
+                Size = UDim2.new(0, 0, 1, 0),
+                AutomaticSize = Enum.AutomaticSize.X,
                 BackgroundTransparency = 1,
                 Text = string.format(fmt, currentValue),
                 TextColor3 = ACCENT,
                 Font = Enum.Font.GothamBold,
-                TextSize = 12,
-                TextXAlignment = Enum.TextXAlignment.Right,
-                ZIndex = 4
-            }, Row)
+                TextSize = 11,
+                ZIndex = 5
+            }, ValuePill)
 
             local BarBG = New("Frame", {
-                Size = UDim2.new(1, 0, 0, 6),
-                Position = UDim2.new(0, 0, 0, 28),
+                Size = UDim2.new(1, -16, 0, 6),
+                Position = UDim2.new(0, 8, 0, 34),
                 BackgroundColor3 = BG_OFF,
                 ZIndex = 4
             }, Row)
@@ -1364,22 +1376,26 @@ function Library:CreateWindow(config)
 
             local Fill = New("Frame", {
                 Size = UDim2.new(initPct, 0, 1, 0),
-                BackgroundColor3 = ACCENT_DARK,
+                BackgroundColor3 = WHITE,
                 ZIndex = 5
             }, BarBG)
             Corner(Fill, UDim.new(1, 0))
+            New("UIGradient", {
+                Color = ColorSequence.new(ACCENT_DARK, ACCENT)
+            }, Fill)
 
             local Knob = New("Frame", {
-                Size = UDim2.new(0, 14, 0, 14),
-                Position = UDim2.new(initPct, -7, 0.5, -7),
+                Size = UDim2.new(0, 16, 0, 16),
+                Position = UDim2.new(initPct, -8, 0.5, -8),
                 BackgroundColor3 = WHITE,
                 ZIndex = 6
             }, BarBG)
             Corner(Knob, UDim.new(1, 0))
+            local KnobStroke = Stroke(Knob, ACCENT, 2)
 
             local InputBtn = New("TextButton", {
-                Size = UDim2.new(1, 0, 0, 22),
-                Position = UDim2.new(0, 0, 0, 20),
+                Size = UDim2.new(1, 0, 0, 28),
+                Position = UDim2.new(0, 0, 0, 22),
                 BackgroundTransparency = 1,
                 Text = "",
                 AutoButtonColor = false,
@@ -1396,10 +1412,10 @@ function Library:CreateWindow(config)
                 local pct = (v - minValue) / (maxValue - minValue)
                 if animate then
                     Tween(Fill, TweenInfo.new(0.05), { Size = UDim2.new(pct, 0, 1, 0) })
-                    Tween(Knob, TweenInfo.new(0.05), { Position = UDim2.new(pct, -7, 0.5, -7) })
+                    Tween(Knob, TweenInfo.new(0.05), { Position = UDim2.new(pct, -8, 0.5, -8) })
                 else
                     Fill.Size = UDim2.new(pct, 0, 1, 0)
-                    Knob.Position = UDim2.new(pct, -7, 0.5, -7)
+                    Knob.Position = UDim2.new(pct, -8, 0.5, -8)
                 end
                 SafeCall(callback, v)
             end
@@ -1417,6 +1433,8 @@ function Library:CreateWindow(config)
                 dragging = false
                 activeInput = nil
                 Page.ScrollingEnabled = true
+                Tween(Knob, TweenInfo.new(0.12), { Size = UDim2.new(0, 16, 0, 16) })
+                KnobStroke.Thickness = 2
             end
 
             InputBtn.InputBegan:Connect(function(input)
@@ -1425,6 +1443,7 @@ function Library:CreateWindow(config)
                     dragging = true
                     activeInput = input
                     Page.ScrollingEnabled = false
+                    KnobStroke.Thickness = 3
                     UpdateFromX(input.Position.X)
                 end
             end)
