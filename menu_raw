@@ -75,109 +75,6 @@ local function Tween(inst, info, props)
     return t
 end
 
--- ===================== THÀNH PHẦN DÙNG CHUNG: SWITCH + TEXTBOX =====================
--- Switch phẳng: nền xám khi tắt, màu nhấn khi bật; bi trắng co giãn nhẹ khi nhấn.
-local function MakeSwitch(parent, pos, initial, z, w, h)
-    w = w or 36
-    h = h or 20
-    local kn    = h - 6
-    local grow  = math.floor(kn * 0.3 + 0.5)
-    local state = initial and true or false
-
-    local function KnobPos(on, width)
-        local y = -math.floor(kn / 2)
-        if on then return UDim2.new(1, -(width + 3), 0.5, y) end
-        return UDim2.new(0, 3, 0.5, y)
-    end
-
-    local Track = New("Frame", {
-        Size = UDim2.new(0, w, 0, h),
-        Position = pos,
-        BackgroundColor3 = state and ACCENT or BG_OFF,
-        ZIndex = z
-    }, parent)
-    Corner(Track, UDim.new(1, 0))
-    local TrackStroke = Stroke(Track, STROKE_COL, 1, state and 1 or 0)
-
-    local Knob = New("Frame", {
-        Size = UDim2.new(0, kn, 0, kn),
-        Position = KnobPos(state, kn),
-        BackgroundColor3 = state and WHITE or TEXT_DIM,
-        ZIndex = z + 1
-    }, Track)
-    Corner(Knob, UDim.new(1, 0))
-
-    local moveInfo  = TweenInfo.new(0.18, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
-    local pressInfo = TweenInfo.new(0.1, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-
-    local sw = { Track = Track }
-
-    function sw.Set(v)
-        state = v and true or false
-        Tween(Track, moveInfo, { BackgroundColor3 = state and ACCENT or BG_OFF })
-        Tween(TrackStroke, moveInfo, { Transparency = state and 1 or 0 })
-        Tween(Knob, moveInfo, {
-            Position = KnobPos(state, kn),
-            Size = UDim2.new(0, kn, 0, kn),
-            BackgroundColor3 = state and WHITE or TEXT_DIM
-        })
-    end
-
-    function sw.Press(down)
-        local width = down and (kn + grow) or kn
-        Tween(Knob, pressInfo, { Size = UDim2.new(0, width, 0, kn), Position = KnobPos(state, width) })
-    end
-
-    function sw.Get() return state end
-
-    -- Gắn hiệu ứng nhấn cho 1 nút bất kỳ (cả hàng bấm được)
-    function sw.Bind(btn)
-        btn.MouseButton1Down:Connect(function() sw.Press(true) end)
-        btn.MouseButton1Up:Connect(function() sw.Press(false) end)
-        btn.MouseLeave:Connect(function() sw.Press(false) end)
-    end
-
-    return sw
-end
-
--- Ô nhập tối giản: nền lõm tối, viền chuyển màu nhấn khi focus, tự bôi đen chữ khi focus.
-local function MakeInput(parent, props)
-    local p = {
-        BackgroundColor3 = BG_MAIN,
-        TextColor3 = TEXT_MAIN,
-        PlaceholderColor3 = Color3.fromRGB(110, 116, 130),
-        Font = Enum.Font.GothamMedium,
-        TextSize = 12,
-        Text = "",
-        ClearTextOnFocus = false,
-        ClipsDescendants = true,
-        TextXAlignment = Enum.TextXAlignment.Left,
-        ZIndex = 5
-    }
-    for k, v in pairs(props or {}) do p[k] = v end
-
-    local Input = New("TextBox", p, parent)
-    Corner(Input, UDim.new(0, 7))
-    local st = Stroke(Input, STROKE_COL, 1)
-    New("UIPadding", { PaddingLeft = UDim.new(0, 8), PaddingRight = UDim.new(0, 8) }, Input)
-
-    local info = TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-    Input.Focused:Connect(function()
-        Tween(st, info, { Color = ACCENT })
-        task.defer(function()
-            pcall(function()
-                Input.CursorPosition = #Input.Text + 1
-                Input.SelectionStart = 1
-            end)
-        end)
-    end)
-    Input.FocusLost:Connect(function()
-        Tween(st, info, { Color = STROKE_COL })
-    end)
-
-    return Input, st
-end
-
 local function SafeCall(cb, ...)
     if type(cb) ~= "function" then return end
     local ok, err = pcall(cb, ...)
@@ -1025,7 +922,7 @@ function Library:CreateWindow(config)
         }, Scroll)
         Corner(RainbowRow, UDim.new(0, 6))
         New("TextLabel", {
-            Size = UDim2.new(1, -36, 1, 0),
+            Size = UDim2.new(1, -40, 1, 0),
             Position = UDim2.new(0, 6, 0, 0),
             BackgroundTransparency = 1,
             Font = Enum.Font.GothamMedium,
@@ -1036,10 +933,24 @@ function Library:CreateWindow(config)
             Text = "Cầu vồng",
             ZIndex = 5
         }, RainbowRow)
-        local RainbowSwitch = MakeSwitch(RainbowRow, UDim2.new(1, -32, 0.5, -7), true, 5, 26, 14)
-        RainbowSwitch.Bind(RainbowRow)
+        local SwTrack = New("Frame", {
+            Size = UDim2.new(0, 26, 0, 14),
+            Position = UDim2.new(1, -32, 0.5, -7),
+            BackgroundColor3 = ACCENT,
+            ZIndex = 5
+        }, RainbowRow)
+        Corner(SwTrack, UDim.new(1, 0))
+        local SwKnob = New("Frame", {
+            Size = UDim2.new(0, 10, 0, 10),
+            Position = UDim2.new(1, -12, 0.5, -5),
+            BackgroundColor3 = WHITE,
+            ZIndex = 6
+        }, SwTrack)
+        Corner(SwKnob, UDim.new(1, 0))
+
         local function UpdateSwitch()
-            RainbowSwitch.Set(rainbowOn)
+            Tween(SwTrack, fastInfo, { BackgroundColor3 = rainbowOn and ACCENT or BG_OFF })
+            Tween(SwKnob, fastInfo, { Position = rainbowOn and UDim2.new(1, -12, 0.5, -5) or UDim2.new(0, 2, 0.5, -5) })
         end
 
         -- Ô chọn màu viền
@@ -1223,12 +1134,22 @@ function Library:CreateWindow(config)
         RefreshOpacity()
 
         -- Nhập ID ảnh tùy chọn
-        local IdBox = MakeInput(Scroll, {
-            Size = UDim2.new(1, -4, 0, 26),
+        local IdBox = New("TextBox", {
+            Size = UDim2.new(1, -4, 0, 24),
+            BackgroundColor3 = BG_CONTROL,
+            Font = Enum.Font.Gotham,
             TextSize = 10,
+            TextColor3 = TEXT_MAIN,
             PlaceholderText = "ID ảnh + Enter",
-            LayoutOrder = NextOrder()
-        })
+            PlaceholderColor3 = TEXT_DIM,
+            Text = "",
+            ClearTextOnFocus = false,
+            TextXAlignment = Enum.TextXAlignment.Left,
+            LayoutOrder = NextOrder(),
+            ZIndex = 5
+        }, Scroll)
+        Corner(IdBox, UDim.new(0, 6))
+        New("UIPadding", { PaddingLeft = UDim.new(0, 6), PaddingRight = UDim.new(0, 6) }, IdBox)
 
         IdBox.FocusLost:Connect(function()
             local t = (IdBox.Text:gsub("%s+", ""))
@@ -1395,6 +1316,477 @@ function Library:CreateWindow(config)
                 if infoOpen then StartLive() end
             else
                 StopLive()
+            end
+        end
+
+        MainFrame:GetPropertyChangedSignal("Position"):Connect(Sync)
+        MainFrame:GetPropertyChangedSignal("Size"):Connect(Sync)
+        MainFrame:GetPropertyChangedSignal("Visible"):Connect(Sync)
+        Sync()
+    end
+
+    -- ===================== TAB NGƯỜI CHƠI TRONG SERVER (bên trái menu) =====================
+    do
+        local lp             = Players.LocalPlayer
+        local StarterGui     = game:GetService("StarterGui")
+        local ARROW_W        = 22
+        local GAP            = 4
+        local PAD            = 3
+        local INFO_W         = math.max(90, math.floor(FULL_W / 3) - 6) -- nhỏ hơn 1/3 menu chính
+        local IN_W           = INFO_W - 12
+        local DOCK_W         = 3 + ARROW_W + GAP + INFO_W + GAP
+        local OPEN_X         = 3 + ARROW_W + GAP
+        local CLOSED_X       = DOCK_W + 6
+        local ARROW_OPEN_X   = 3                      -- mũi tên nằm NGOÀI CÙNG bên trái khi mở
+        local ARROW_CLOSED_X = DOCK_W - ARROW_W       -- khi thu: sát menu
+        local panelOpen      = false
+        local selected       = nil
+        local sending        = false
+        local slideInfo      = TweenInfo.new(0.35, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+
+        local Dock = New("Frame", {
+            Name = "PlayersDock",
+            Size = UDim2.new(0, DOCK_W, 0, FULL_H + PAD * 2),
+            BackgroundTransparency = 1,
+            ClipsDescendants = true,
+            Active = false,
+            Visible = false,
+            ZIndex = 2
+        }, ScreenGui)
+
+        local Panel = New("Frame", {
+            Name = "PlayersPanel",
+            Size = UDim2.new(0, INFO_W, 1, -PAD * 2),
+            Position = UDim2.new(0, CLOSED_X, 0, PAD),
+            BackgroundColor3 = BG_MAIN,
+            ZIndex = 2
+        }, Dock)
+        Corner(Panel, UDim.new(0, 10))
+        table.insert(borderTargets, Stroke(Panel, ACCENT, 1.5))
+
+        -- Tiêu đề + số người
+        local TitleLbl = New("TextLabel", {
+            Size = UDim2.new(1, -12, 0, 22),
+            Position = UDim2.new(0, 6, 0, 3),
+            BackgroundTransparency = 1,
+            Font = Enum.Font.GothamBold,
+            TextSize = 11,
+            TextScaled = true,
+            TextColor3 = ACCENT,
+            TextXAlignment = Enum.TextXAlignment.Left,
+            Text = "👥 Người chơi",
+            ZIndex = 3
+        }, Panel)
+        New("UITextSizeConstraint", { MaxTextSize = 11, MinTextSize = 8 }, TitleLbl)
+
+        local function UpdateCount()
+            TitleLbl.Text = "👥 " .. #Players:GetPlayers() .. " người chơi"
+        end
+
+        -- Nút kết bạn tất cả (đặt phía trên tab con)
+        local AllBtn = New("TextButton", {
+            Size = UDim2.new(1, -16, 0, 26),
+            Position = UDim2.new(0, 8, 0, 28),
+            BackgroundColor3 = ACCENT_DARK,
+            Text = "Kết bạn tất cả",
+            TextColor3 = WHITE,
+            Font = Enum.Font.GothamBold,
+            TextSize = 11,
+            TextScaled = true,
+            AutoButtonColor = true,
+            ZIndex = 3
+        }, Panel)
+        Corner(AllBtn, UDim.new(0, 6))
+        New("UITextSizeConstraint", { MaxTextSize = 11, MinTextSize = 8 }, AllBtn)
+        New("UIPadding", { PaddingLeft = UDim.new(0, 4), PaddingRight = UDim.new(0, 4) }, AllBtn)
+
+        -- Vùng nội dung: lưới avatar  <->  tab con chi tiết
+        local Content = New("Frame", {
+            Size = UDim2.new(1, -8, 1, -62),
+            Position = UDim2.new(0, 4, 0, 58),
+            BackgroundTransparency = 1,
+            ZIndex = 3
+        }, Panel)
+
+        local function MakeScroll(visible)
+            return New("ScrollingFrame", {
+                Size = UDim2.new(1, 0, 1, 0),
+                BackgroundTransparency = 1,
+                ScrollBarThickness = 2,
+                ScrollBarImageColor3 = Color3.fromRGB(80, 85, 100),
+                CanvasSize = UDim2.new(0, 0, 0, 0),
+                AutomaticCanvasSize = Enum.AutomaticSize.Y,
+                ScrollingDirection = Enum.ScrollingDirection.Y,
+                Visible = visible,
+                ZIndex = 3
+            }, Content)
+        end
+
+        local GridView   = MakeScroll(true)
+        local DetailView = MakeScroll(false)
+
+        local cols = IN_W >= 108 and 3 or 2
+        local cell = math.floor((IN_W - 4 - (cols - 1) * 4) / cols)
+        New("UIGridLayout", {
+            CellSize = UDim2.new(0, cell, 0, cell),
+            CellPadding = UDim2.new(0, 4, 0, 4),
+            SortOrder = Enum.SortOrder.LayoutOrder
+        }, GridView)
+
+        New("UIListLayout", {
+            Padding = UDim.new(0, 4),
+            SortOrder = Enum.SortOrder.LayoutOrder,
+            HorizontalAlignment = Enum.HorizontalAlignment.Center
+        }, DetailView)
+
+        local function ThumbUrl(userId)
+            return "rbxthumb://type=AvatarHeadShot&id=" .. userId .. "&w=150&h=150"
+        end
+
+        -- ============ TAB CON: chi tiết người chơi ============
+        local BackBtn = New("TextButton", {
+            Size = UDim2.new(1, -4, 0, 22),
+            BackgroundColor3 = BG_CONTROL,
+            Text = "< Quay lại",
+            TextColor3 = ACCENT,
+            Font = Enum.Font.GothamBold,
+            TextSize = 10,
+            AutoButtonColor = false,
+            LayoutOrder = 1,
+            ZIndex = 4
+        }, DetailView)
+        Corner(BackBtn, UDim.new(0, 6))
+
+        local DAvatar = New("ImageLabel", {
+            Size = UDim2.new(0, 60, 0, 60),
+            BackgroundColor3 = BG_CONTROL,
+            Image = "",
+            LayoutOrder = 2,
+            ZIndex = 4
+        }, DetailView)
+        Corner(DAvatar, UDim.new(1, 0))
+        Stroke(DAvatar, ACCENT, 1.5)
+
+        local DName = New("TextLabel", {
+            Size = UDim2.new(1, -4, 0, 16),
+            BackgroundTransparency = 1,
+            Font = Enum.Font.GothamBold,
+            TextSize = 11,
+            TextColor3 = TEXT_MAIN,
+            TextTruncate = Enum.TextTruncate.AtEnd,
+            Text = "-",
+            LayoutOrder = 3,
+            ZIndex = 4
+        }, DetailView)
+
+        local rowOrder = 3
+        local function Row(label)
+            rowOrder = rowOrder + 1
+            local f = New("Frame", {
+                Size = UDim2.new(1, -4, 0, 32),
+                BackgroundColor3 = BG_CONTROL,
+                LayoutOrder = rowOrder,
+                ZIndex = 4
+            }, DetailView)
+            Corner(f, UDim.new(0, 6))
+            New("TextLabel", {
+                Size = UDim2.new(1, -10, 0, 12),
+                Position = UDim2.new(0, 6, 0, 3),
+                BackgroundTransparency = 1,
+                Font = Enum.Font.Gotham,
+                TextSize = 10,
+                TextXAlignment = Enum.TextXAlignment.Left,
+                TextTruncate = Enum.TextTruncate.AtEnd,
+                TextColor3 = TEXT_DIM,
+                Text = label,
+                ZIndex = 5
+            }, f)
+            return New("TextLabel", {
+                Size = UDim2.new(1, -10, 0, 14),
+                Position = UDim2.new(0, 6, 0, 15),
+                BackgroundTransparency = 1,
+                Font = Enum.Font.GothamBold,
+                TextSize = 12,
+                TextXAlignment = Enum.TextXAlignment.Left,
+                TextTruncate = Enum.TextTruncate.AtEnd,
+                TextColor3 = TEXT_MAIN,
+                Text = "-",
+                ZIndex = 5
+            }, f)
+        end
+
+        local vUser    = Row("Tên người dùng")
+        local vId      = Row("User ID")
+        local vAge     = Row("Tuổi tài khoản")
+        local vFriends = Row("Số bạn bè")
+
+        local FriendBtn = New("TextButton", {
+            Size = UDim2.new(1, -4, 0, 28),
+            BackgroundColor3 = ACCENT_DARK,
+            Text = "Kết bạn",
+            TextColor3 = WHITE,
+            Font = Enum.Font.GothamBold,
+            TextSize = 11,
+            AutoButtonColor = false,
+            LayoutOrder = 8,
+            ZIndex = 4
+        }, DetailView)
+        Corner(FriendBtn, UDim.new(0, 6))
+
+        -- ============ Logic kết bạn / số bạn bè ============
+        local friendCache = {}
+        local sentTo      = {}
+
+        local function SendFriend(plr, allowPrompt)
+            local ok = pcall(function() lp:RequestFriendship(plr) end)
+            if not ok and allowPrompt then
+                ok = pcall(function() StarterGui:SetCore("PromptSendFriendRequest", plr) end)
+            end
+            return ok
+        end
+
+        local function IsFriend(plr)
+            local res = false
+            pcall(function() res = lp:IsFriendsWith(plr.UserId) end)
+            return res
+        end
+
+        local function FetchFriendCount(userId, cb)
+            local cached = friendCache[userId]
+            if cached ~= nil then
+                cb(cached or nil)
+                return
+            end
+            task.spawn(function()
+                local ok, n = pcall(function()
+                    local pages = Players:GetFriendsAsync(userId)
+                    local total = 0
+                    for _ = 1, 15 do
+                        total = total + #pages:GetCurrentPage()
+                        if pages.IsFinished then break end
+                        pages:AdvanceToNextPageAsync()
+                    end
+                    return total
+                end)
+                friendCache[userId] = ok and n or false
+                cb(ok and n or nil)
+            end)
+        end
+
+        local function SetFriendBtn(state)
+            if state == "self" then
+                FriendBtn.Visible = false
+                return
+            end
+            FriendBtn.Visible = true
+            if state == "add" then
+                FriendBtn.Text = "Kết bạn"
+                FriendBtn.BackgroundColor3 = ACCENT_DARK
+                FriendBtn.TextColor3 = WHITE
+            elseif state == "friend" then
+                FriendBtn.Text = "Đã là bạn bè"
+                FriendBtn.BackgroundColor3 = BG_OFF
+                FriendBtn.TextColor3 = TEXT_DIM
+            else
+                FriendBtn.Text = "Đã gửi lời mời"
+                FriendBtn.BackgroundColor3 = BG_OFF
+                FriendBtn.TextColor3 = TEXT_DIM
+            end
+        end
+
+        local cells = {}
+        local function Highlight()
+            for plr, c in pairs(cells) do
+                local on = (plr == selected)
+                c.stroke.Color = on and ACCENT or STROKE_COL
+                c.stroke.Thickness = on and 1.5 or 1
+            end
+        end
+
+        local function CloseDetail()
+            selected = nil
+            DetailView.Visible = false
+            GridView.Visible = true
+            Highlight()
+        end
+
+        local function OpenDetail(plr)
+            selected = plr
+            DAvatar.Image = ThumbUrl(plr.UserId)
+            DName.Text = plr.DisplayName
+            vUser.Text = "@" .. plr.Name
+            vId.Text = tostring(plr.UserId)
+            vAge.Text = plr.AccountAge .. " ngày"
+            vFriends.Text = "Đang tải..."
+
+            GridView.Visible = false
+            DetailView.Visible = true
+            DetailView.CanvasPosition = Vector2.new(0, 0)
+            Highlight()
+
+            if plr == lp then
+                SetFriendBtn("self")
+            else
+                SetFriendBtn(sentTo[plr.UserId] and "sent" or "add")
+                task.spawn(function()
+                    if IsFriend(plr) and selected == plr then SetFriendBtn("friend") end
+                end)
+            end
+
+            FetchFriendCount(plr.UserId, function(n)
+                if selected == plr then
+                    vFriends.Text = n and tostring(n) or "Không lấy được"
+                end
+            end)
+        end
+
+        BackBtn.MouseButton1Click:Connect(CloseDetail)
+
+        FriendBtn.MouseButton1Click:Connect(function()
+            local plr = selected
+            if not plr or plr == lp or sentTo[plr.UserId] then return end
+            if FriendBtn.Text ~= "Kết bạn" then return end
+            if SendFriend(plr, true) then
+                sentTo[plr.UserId] = true
+                if selected == plr then SetFriendBtn("sent") end
+                Library:Notify({ Type = "success", Title = "Kết bạn", Content = "Đã gửi lời mời tới " .. plr.DisplayName, Duration = 3, Silent = true })
+            else
+                Library:Notify({ Type = "error", Title = "Kết bạn", Content = "Không gửi được lời mời", Duration = 3, Silent = true })
+            end
+        end)
+
+        -- ============ Lưới avatar ============
+        local order = 0
+        local function AddPlayer(plr)
+            if cells[plr] then return end
+            order = order + 1
+            local btn = New("ImageButton", {
+                BackgroundColor3 = BG_CONTROL,
+                Image = ThumbUrl(plr.UserId),
+                ScaleType = Enum.ScaleType.Crop,
+                AutoButtonColor = false,
+                LayoutOrder = (plr == lp) and 0 or order,
+                ZIndex = 4
+            }, GridView)
+            Corner(btn, UDim.new(0, 8))
+            local st = Stroke(btn, STROKE_COL, 1)
+            local cap = New("TextLabel", {
+                Size = UDim2.new(1, 0, 0, 12),
+                Position = UDim2.new(0, 0, 1, -12),
+                BackgroundColor3 = Color3.fromRGB(0, 0, 0),
+                BackgroundTransparency = 0.35,
+                Font = Enum.Font.GothamBold,
+                TextSize = 9,
+                TextColor3 = (plr == lp) and ACCENT or WHITE,
+                TextTruncate = Enum.TextTruncate.AtEnd,
+                Text = plr.DisplayName,
+                ZIndex = 5
+            }, btn)
+            Corner(cap, UDim.new(0, 8))
+            cells[plr] = { btn = btn, stroke = st }
+            btn.MouseButton1Click:Connect(function() OpenDetail(plr) end)
+            UpdateCount()
+        end
+
+        local function RemovePlayer(plr)
+            local c = cells[plr]
+            if c then
+                c.btn:Destroy()
+                cells[plr] = nil
+            end
+            if selected == plr then CloseDetail() end
+            UpdateCount()
+        end
+
+        for _, plr in ipairs(Players:GetPlayers()) do AddPlayer(plr) end
+        Track(Players.PlayerAdded:Connect(AddPlayer))
+        Track(Players.PlayerRemoving:Connect(function(plr)
+            task.defer(RemovePlayer, plr)
+        end))
+        UpdateCount()
+
+        -- ============ Kết bạn tất cả ============
+        AllBtn.MouseButton1Click:Connect(function()
+            if sending then return end
+            local targets = {}
+            for _, plr in ipairs(Players:GetPlayers()) do
+                if plr ~= lp then table.insert(targets, plr) end
+            end
+            if #targets == 0 then
+                Library:Notify({ Type = "warning", Title = "Kết bạn", Content = "Không có người chơi nào khác", Duration = 3, Silent = true })
+                return
+            end
+
+            sending = true
+            task.spawn(function()
+                local sent, skipped, failed = 0, 0, 0
+                for i, plr in ipairs(targets) do
+                    if destroyed then break end
+                    AllBtn.Text = string.format("Đang gửi %d/%d", i, #targets)
+                    if plr.Parent and not IsFriend(plr) and not sentTo[plr.UserId] then
+                        if SendFriend(plr, false) then
+                            sentTo[plr.UserId] = true
+                            sent = sent + 1
+                        else
+                            failed = failed + 1
+                        end
+                        task.wait(0.6) -- giãn cách để tránh bị chặn vì gửi quá nhanh
+                    else
+                        skipped = skipped + 1
+                    end
+                end
+                sending = false
+                AllBtn.Text = "Kết bạn tất cả"
+                if selected and selected ~= lp then
+                    SetFriendBtn(sentTo[selected.UserId] and "sent" or (IsFriend(selected) and "friend" or "add"))
+                end
+                if sent == 0 and failed > 0 then
+                    Library:Notify({ Type = "error", Title = "Kết bạn tất cả", Content = "Executor không hỗ trợ gửi lời mời hàng loạt", Duration = 4 })
+                else
+                    Library:Notify({
+                        Type = "success", Title = "Kết bạn tất cả",
+                        Content = string.format("Đã gửi %d • Bỏ qua %d • Lỗi %d", sent, skipped, failed),
+                        Duration = 4
+                    })
+                end
+            end)
+        end)
+
+        -- ============ Mũi tên: thu = sát menu, mở = ngoài cùng bên trái ============
+        local Arrow = New("TextButton", {
+            Name = "PlayersArrow",
+            Size = UDim2.new(0, ARROW_W, 0, 64),
+            AnchorPoint = Vector2.new(0, 0.5),
+            Position = UDim2.new(0, ARROW_CLOSED_X, 0.5, 0),
+            BackgroundColor3 = BG_MAIN,
+            Text = "<",
+            TextColor3 = ACCENT,
+            Font = Enum.Font.GothamBold,
+            TextSize = 16,
+            AutoButtonColor = false,
+            ZIndex = 6
+        }, Dock)
+        Corner(Arrow, UDim.new(0, 8))
+        table.insert(borderTargets, Stroke(Arrow, ACCENT, 1.5))
+
+        local function SetOpen(open)
+            panelOpen = open
+            Arrow.Text = open and ">" or "<"
+            Tween(Panel, slideInfo, { Position = UDim2.new(0, open and OPEN_X or CLOSED_X, 0, PAD) })
+            Tween(Arrow, slideInfo, { Position = UDim2.new(0, open and ARROW_OPEN_X or ARROW_CLOSED_X, 0.5, 0) })
+        end
+
+        Arrow.MouseButton1Click:Connect(function()
+            SetOpen(not panelOpen)
+        end)
+
+        -- Bám theo mép trái của MainFrame (sự kiện, không polling)
+        local function Sync()
+            local sz, pos = MainFrame.Size, MainFrame.Position
+            local ready = MainFrame.Visible and sz.X.Offset >= FULL_W - 2 and sz.Y.Offset >= FULL_H - 2
+            if Dock.Visible ~= ready then Dock.Visible = ready end
+            if ready then
+                Dock.Position = UDim2.new(pos.X.Scale, pos.X.Offset - DOCK_W, pos.Y.Scale, pos.Y.Offset - PAD)
             end
         end
 
@@ -1692,7 +2084,25 @@ function Library:CreateWindow(config)
                 local Row = MakeRow(38)
                 MakeLabel(Row, labelText, 0.6)
 
-                local sw = MakeSwitch(Row, UDim2.new(1, -46, 0.5, -10), default, 4)
+                local state = default and true or false
+                local POS_ON  = UDim2.new(1, -18, 0.5, -7)
+                local POS_OFF = UDim2.new(0, 3, 0.5, -7)
+
+                local BG = New("Frame", {
+                    Size = UDim2.new(0, 38, 0, 20),
+                    Position = UDim2.new(1, -45, 0.5, -10),
+                    BackgroundColor3 = state and ACCENT_DARK or BG_OFF,
+                    ZIndex = 4
+                }, Row)
+                Corner(BG, UDim.new(1, 0))
+
+                local Ball = New("Frame", {
+                    Size = UDim2.new(0, 14, 0, 14),
+                    Position = state and POS_ON or POS_OFF,
+                    BackgroundColor3 = WHITE,
+                    ZIndex = 5
+                }, BG)
+                Corner(Ball, UDim.new(1, 0))
 
                 local ClickBtn = New("TextButton", {
                     Size = UDim2.new(1, 0, 1, 0),
@@ -1700,19 +2110,24 @@ function Library:CreateWindow(config)
                     Text = "",
                     ZIndex = 5
                 }, Row)
-                sw.Bind(ClickBtn)
+
+                local function Apply(v)
+                    state = v and true or false
+                    Tween(Ball, TweenInfo.new(0.2), { Position = state and POS_ON or POS_OFF })
+                    Tween(BG, TweenInfo.new(0.2), { BackgroundColor3 = state and ACCENT_DARK or BG_OFF })
+                end
 
                 ClickBtn.MouseButton1Click:Connect(function()
-                    sw.Set(not sw.Get())
-                    SafeCall(callback, sw.Get())
+                    Apply(not state)
+                    SafeCall(callback, state)
                 end)
 
                 local obj = {}
                 function obj:Set(v)
-                    sw.Set(v)
-                    SafeCall(callback, sw.Get())
+                    Apply(v)
+                    SafeCall(callback, state)
                 end
-                function obj:Get() return sw.Get() end
+                function obj:Get() return state end
                 return Register(flag, obj)
             end
 
@@ -1722,12 +2137,22 @@ function Library:CreateWindow(config)
 
                 local lastValue = default ~= nil and tostring(default) or ""
 
-                local Input = MakeInput(Row, {
-                    Size = UDim2.new(0.45, -6, 0, 26),
-                    Position = UDim2.new(0.55, 0, 0.5, -13),
+                local Input = New("TextBox", {
+                    Size = UDim2.new(0, 75, 0, 26),
+                    Position = UDim2.new(1, -80, 0.5, -13),
+                    BackgroundColor3 = BG_CONTROL,
+                    TextColor3 = ACCENT,
                     PlaceholderText = placeholder or "...",
-                    Text = lastValue
-                })
+                    PlaceholderColor3 = Color3.fromRGB(100, 105, 115),
+                    Text = lastValue,
+                    TextSize = 12,
+                    Font = Enum.Font.GothamBold,
+                    ClearTextOnFocus = true,
+                    ClipsDescendants = true,
+                    ZIndex = 5
+                }, Row)
+                Corner(Input, UDim.new(0, 6))
+                Stroke(Input, STROKE_COL, 1)
 
                 Input.FocusLost:Connect(function()
                     if Input.Text == "" then
