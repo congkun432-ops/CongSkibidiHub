@@ -133,6 +133,7 @@ function ESP:AddESP(Params)
     local Object = Params.Object
     if ESP.ElementsEnabled[Object] or ESP.Unloaded then return end
     if not Object:IsA("BasePart") and not Object:IsA("Model") then return end
+    local NoTracer = Params.NoTracer and true or false           -- true: không bao giờ kẻ đường nối cho vật này (chỉ hiện ESP)
     local AlwaysTracer = Params.AlwaysTracer and true or false   -- true: luôn kẻ đường nối (kể cả ngoài màn hình / sau lưng)
 
     ESP.ElementsEnabled[Object] = true
@@ -208,7 +209,7 @@ function ESP:AddESP(Params)
             local HL = ESP.Highlights[Object]
             local Line = ESP.Lines[Object]
 
-            if Line and Line[1] then Line[1].Visible = OnScreen or AlwaysTracer end
+            if Line and Line[1] then Line[1].Visible = (OnScreen or AlwaysTracer) and not NoTracer end
             if Frame then
                 Frame.Visible = OnScreen
                 if OnScreen then Frame.Position = UDim2.fromOffset(SP.X, SP.Y) end
@@ -245,7 +246,7 @@ function ESP:AddESP(Params)
                 end
             end
 
-            if Line and ESP.Tracers and ((HL and OnScreen) or AlwaysTracer) then
+            if Line and ESP.Tracers and not NoTracer and ((HL and OnScreen) or AlwaysTracer) then
                 local SS = Camera.ViewportSize
                 local Origin
                 if ESP.TracerOrigin == "Center" then
