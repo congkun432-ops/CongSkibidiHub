@@ -175,6 +175,8 @@ local function PlayNotifySound(customId)
     end)
 end
 
+local NOTIF_W = 220
+
 local function EnsureNotifyGui()
     if NotifyGui and NotifyGui.Parent then return NotifyGui end
 
@@ -188,13 +190,13 @@ local function EnsureNotifyGui()
 
     local Container = New("Frame", {
         Name = "Container",
-        Size = UDim2.new(0, 290, 0, 0),
-        Position = UDim2.new(1, -305, 0, 45),
+        Size = UDim2.new(0, NOTIF_W, 0, 0),
+        Position = UDim2.new(1, -(NOTIF_W + 12), 0, 40),
         BackgroundTransparency = 1
     }, NotifyGui)
 
     New("UIListLayout", {
-        Padding = UDim.new(0, 5),
+        Padding = UDim.new(0, 4),
         SortOrder = Enum.SortOrder.LayoutOrder,
         HorizontalAlignment = Enum.HorizontalAlignment.Right
     }, Container)
@@ -218,7 +220,6 @@ function Library:Notify(config)
     local Silent   = config.Silent or config.silent or false
     local SoundId  = config.SoundId or config.soundId
 
-    if typeInfo then Title = typeInfo.Icon .. "  " .. Title end
     if type(Duration) ~= "number" or Duration <= 0 then Duration = 4 end
     Content = tostring(Content)
 
@@ -236,17 +237,16 @@ function Library:Notify(config)
 
     notifySlot = notifySlot + 1
 
-    local TEXT_W = 262
-    local contentHeight = 14
+    local TEXT_X = 36
+    local TEXT_W = NOTIF_W - TEXT_X - 10
+    local contentHeight = 0
     if #Content > 0 then
         local ok, bounds = pcall(function()
-            return TextService:GetTextSize(Content, 11, Enum.Font.GothamMedium, Vector2.new(TEXT_W, 1000))
+            return TextService:GetTextSize(Content, 10, Enum.Font.GothamMedium, Vector2.new(TEXT_W, 1000))
         end)
-        if ok and bounds then
-            contentHeight = math.max(14, bounds.Y)
-        end
+        contentHeight = (ok and bounds) and math.max(12, bounds.Y) or 12
     end
-    local totalHeight = math.max(40, 19 + contentHeight + 11)
+    local totalHeight = math.max(34, 19 + contentHeight + 11)
 
     local Holder = New("Frame", {
         Name = "Holder",
@@ -259,56 +259,70 @@ function Library:Notify(config)
     local Notif = New("Frame", {
         Name = "Notif",
         Size = UDim2.new(1, 0, 0, totalHeight),
-        Position = UDim2.new(1, 340, 0, 0),
+        Position = UDim2.new(1, 260, 0, 0),
         BackgroundColor3 = BG_PANEL,
         BackgroundTransparency = 1,
         ZIndex = 2
     }, Holder)
-    Corner(Notif, UDim.new(0, 7))
+    Corner(Notif, UDim.new(0, 9))
 
-    local NotifStroke = Stroke(Notif, Accent, 1.2, 1)
+    local NotifStroke = Stroke(Notif, Accent, 1, 1)
     NotifStroke.ZIndex = 3
 
-    local AccentBar = New("Frame", {
-        Size = UDim2.new(0, 3, 1, -16),
-        Position = UDim2.new(0, 4, 0, 4),
+    -- Huy hiệu icon tròn, nền là màu nhấn đã làm nhạt
+    local IconBadge = New("Frame", {
+        Size = UDim2.new(0, 20, 0, 20),
+        Position = UDim2.new(0, 9, 0, 7),
         BackgroundColor3 = Accent,
         BackgroundTransparency = 1,
         ZIndex = 3
     }, Notif)
-    Corner(AccentBar, UDim.new(1, 0))
+    Corner(IconBadge, UDim.new(1, 0))
 
-    local TitleLbl = New("TextLabel", {
-        Size = UDim2.new(1, -18, 0, 16),
-        Position = UDim2.new(0, 13, 0, 3),
+    local IconLbl = New("TextLabel", {
+        Size = UDim2.new(1, 0, 1, 0),
         BackgroundTransparency = 1,
-        Text = Title,
+        Text = typeInfo and typeInfo.Icon or "•",
         TextColor3 = Accent,
         TextTransparency = 1,
         Font = Enum.Font.GothamBold,
-        TextSize = 12,
+        TextSize = 11,
+        ZIndex = 4
+    }, IconBadge)
+
+    local TitleLbl = New("TextLabel", {
+        Size = UDim2.new(1, -(TEXT_X + 8), 0, 14),
+        Position = UDim2.new(0, TEXT_X, 0, 4),
+        BackgroundTransparency = 1,
+        Text = Title,
+        TextColor3 = TEXT_MAIN,
+        TextTransparency = 1,
+        Font = Enum.Font.GothamBold,
+        TextSize = 11,
         TextXAlignment = Enum.TextXAlignment.Left,
+        TextTruncate = Enum.TextTruncate.AtEnd,
         ZIndex = 3
     }, Notif)
 
     local ContentLbl = New("TextLabel", {
-        Size = UDim2.new(1, -18, 0, contentHeight),
-        Position = UDim2.new(0, 13, 0, 20),
+        Size = UDim2.new(1, -(TEXT_X + 8), 0, contentHeight),
+        Position = UDim2.new(0, TEXT_X, 0, 18),
         BackgroundTransparency = 1,
         Text = Content,
-        TextColor3 = Color3.fromRGB(220, 220, 220),
+        TextColor3 = Color3.fromRGB(165, 170, 182),
         TextTransparency = 1,
         Font = Enum.Font.GothamMedium,
-        TextSize = 11,
+        TextSize = 10,
         TextXAlignment = Enum.TextXAlignment.Left,
         TextYAlignment = Enum.TextYAlignment.Top,
         TextWrapped = true,
         ZIndex = 3
     }, Notif)
 
+    -- Thanh thời gian mảnh ở đáy
     local BarTrack = New("Frame", {
-        Size = UDim2.new(1, -20, 0, 3),
-        Position = UDim2.new(0, 10, 1, -7),
+        Size = UDim2.new(1, -20, 0, 2),
+        Position = UDim2.new(0, 10, 1, -6),
         BackgroundColor3 = BG_OFF,
         BackgroundTransparency = 1,
         ZIndex = 3
@@ -323,9 +337,9 @@ function Library:Notify(config)
     }, BarTrack)
     Corner(BarFill, UDim.new(1, 0))
 
-    local slideIn  = TweenInfo.new(0.55, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
-    local fadeIn   = TweenInfo.new(0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-    local growInfo = TweenInfo.new(0.35, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+    local slideIn  = TweenInfo.new(0.5, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+    local fadeIn   = TweenInfo.new(0.35, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+    local growInfo = TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
 
     local dismissed = false
 
@@ -343,22 +357,23 @@ function Library:Notify(config)
         task.spawn(function()
             if not Notif or not Notif.Parent then return end
 
-            local outInfo = TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.In)
-            local outFade = TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+            local outInfo = TweenInfo.new(0.35, Enum.EasingStyle.Quint, Enum.EasingDirection.In)
+            local outFade = TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
 
-            Tween(Notif, outInfo, { Position = UDim2.new(1, 340, 0, 0) })
+            Tween(Notif, outInfo, { Position = UDim2.new(1, 260, 0, 0) })
             Tween(Notif, outFade, { BackgroundTransparency = 1 })
             Tween(NotifStroke, outFade, { Transparency = 1 })
-            Tween(AccentBar, outFade, { BackgroundTransparency = 1 })
+            Tween(IconBadge, outFade, { BackgroundTransparency = 1 })
+            Tween(IconLbl, outFade, { TextTransparency = 1 })
             Tween(TitleLbl, outFade, { TextTransparency = 1 })
             Tween(ContentLbl, outFade, { TextTransparency = 1 })
             Tween(BarTrack, outFade, { BackgroundTransparency = 1 })
             Tween(BarFill, outFade, { BackgroundTransparency = 1 })
 
-            task.wait(0.35)
+            task.wait(0.3)
             if not Holder or not Holder.Parent then return end
 
-            local collapse = Tween(Holder, TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
+            local collapse = Tween(Holder, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
                 Size = UDim2.new(1, 0, 0, 0)
             })
             collapse.Completed:Wait()
@@ -377,12 +392,13 @@ function Library:Notify(config)
     task.delay(0.08, function()
         if dismissed or not Notif or not Notif.Parent then return end
         Tween(Notif, slideIn, { Position = UDim2.new(0, 0, 0, 0) })
-        Tween(Notif, fadeIn, { BackgroundTransparency = 0 })
-        Tween(NotifStroke, fadeIn, { Transparency = 0.35 })
-        Tween(AccentBar, fadeIn, { BackgroundTransparency = 0 })
+        Tween(Notif, fadeIn, { BackgroundTransparency = 0.02 })
+        Tween(NotifStroke, fadeIn, { Transparency = 0.55 })
+        Tween(IconBadge, fadeIn, { BackgroundTransparency = 0.8 })
+        Tween(IconLbl, fadeIn, { TextTransparency = 0 })
         Tween(TitleLbl, fadeIn, { TextTransparency = 0 })
         Tween(ContentLbl, fadeIn, { TextTransparency = 0 })
-        Tween(BarTrack, fadeIn, { BackgroundTransparency = 0.3 })
+        Tween(BarTrack, fadeIn, { BackgroundTransparency = 0.4 })
         Tween(BarFill, fadeIn, { BackgroundTransparency = 0 })
     end)
 
@@ -496,6 +512,20 @@ function Library:CreateWindow(config)
     Corner(MainFrame, UDim.new(0, 10))
     local MainStroke = Stroke(MainFrame, ACCENT, 1.5)
 
+    -- Ảnh nền menu (mặc định lấy ảnh của menu nhỏ; chỉnh trong tab thông tin)
+    local BgImage = New("ImageLabel", {
+        Name = "BgImage",
+        Size = UDim2.new(1, 0, 1, 0),
+        BackgroundTransparency = 1,
+        Image = "",
+        ImageTransparency = 0.75,
+        ScaleType = Enum.ScaleType.Crop,
+        Visible = false,
+        Active = false,
+        ZIndex = 2
+    }, MainFrame)
+    Corner(BgImage, UDim.new(0, 10))
+
     local TitleBar = New("Frame", {
         Name = "TitleBar",
         Size = UDim2.new(1, 0, 0, 40),
@@ -537,17 +567,40 @@ function Library:CreateWindow(config)
     local MinimizeBtn = HeaderButton(-72, Color3.fromRGB(54, 59, 72), "–", 14)
     local DestroyBtn  = HeaderButton(-106, Color3.fromRGB(180, 40, 40), "D", 13)
 
-    local rainbowAcc = 0
-    Track(RunService.Heartbeat:Connect(function(dt)
-        rainbowAcc = rainbowAcc + dt
-        if rainbowAcc < 0.03 then return end
-        rainbowAcc = 0
-        local rainbow = Color3.fromHSV((tick() % 6) / 6, 0.7, 1)
-        if MainFrame.Visible then
-            MainStroke.Color = rainbow
-            TitleLabel.TextColor3 = rainbow
+    -- Viền: cầu vồng (bật/tắt được) hoặc màu cố định. Khi tắt cầu vồng thì không còn vòng lặp nào chạy.
+    local rainbowOn     = true
+    local borderColor   = ACCENT
+    local rainbowConn   = nil
+    local borderTargets = { MainStroke }
+
+    local function ApplyBorderColor(c)
+        for i = 1, #borderTargets do
+            borderTargets[i].Color = c
         end
-    end))
+        TitleLabel.TextColor3 = c
+    end
+
+    local function SetRainbow(on)
+        rainbowOn = on
+        if rainbowConn then
+            rainbowConn:Disconnect()
+            rainbowConn = nil
+        end
+        if on then
+            local acc = 0
+            rainbowConn = Track(RunService.Heartbeat:Connect(function(dt)
+                acc = acc + dt
+                if acc < 0.03 then return end
+                acc = 0
+                if MainFrame.Visible then
+                    ApplyBorderColor(Color3.fromHSV((tick() % 6) / 6, 0.7, 1))
+                end
+            end))
+        else
+            ApplyBorderColor(borderColor)
+        end
+    end
+    SetRainbow(true)
 
     local TabContainer = New("ScrollingFrame", {
         Name = "TabContainer",
@@ -741,18 +794,22 @@ function Library:CreateWindow(config)
     CloseBtn.MouseButton1Click:Connect(CloseMenu)
     MinimizeBtn.MouseButton1Click:Connect(MinimizeMenu)
 
-    -- ===================== TAB THÔNG TIN NGƯỜI CHƠI (bên phải menu) =====================
+    -- ===================== TAB THÔNG TIN + TÙY CHỈNH GIAO DIỆN (bên phải menu) =====================
     do
-        local lp       = Players.LocalPlayer
-        local ARROW_W  = 22
-        local GAP      = 4
-        local PAD      = 3
-        local INFO_W   = math.max(88, math.floor(FULL_W / 3) - 10) -- nhỏ hơn 1/3 menu chính
-        local DOCK_W   = ARROW_W + GAP + INFO_W + 4
-        local CLOSED_X = -INFO_W - 6
-        local OPEN_X   = ARROW_W + GAP
-        local infoOpen = false
-        local fpsConn  = nil
+        local lp           = Players.LocalPlayer
+        local ARROW_W      = 22
+        local GAP          = 4
+        local PAD          = 3
+        local INFO_W       = math.max(90, math.floor(FULL_W / 3) - 6) -- luôn nhỏ hơn 1/3 menu chính
+        local IN_W         = INFO_W - 12                              -- bề rộng khả dụng trong vùng cuộn
+        local OPEN_X       = GAP
+        local CLOSED_X     = -INFO_W - 6
+        local ARROW_OPEN_X = GAP + INFO_W + GAP                       -- mũi tên nằm NGOÀI CÙNG bên phải khi mở
+        local DOCK_W       = ARROW_OPEN_X + ARROW_W + 3
+        local infoOpen     = false
+        local fpsConn      = nil
+        local fastInfo     = TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+        local slideInfo    = TweenInfo.new(0.35, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
 
         -- Dock cắt phần panel đang thu lại; nằm ngoài MainFrame (MainFrame có ClipsDescendants)
         local Dock = New("Frame", {
@@ -773,31 +830,55 @@ function Library:CreateWindow(config)
             ZIndex = 2
         }, Dock)
         Corner(Panel, UDim.new(0, 10))
-        Stroke(Panel, ACCENT, 1.5)
+        table.insert(borderTargets, Stroke(Panel, ACCENT, 1.5))
 
-        New("TextLabel", {
-            Size = UDim2.new(1, 0, 0, 26),
-            BackgroundTransparency = 1,
-            Font = Enum.Font.GothamBold,
-            TextSize = 12,
-            TextColor3 = ACCENT,
-            Text = "👤 Thông Tin",
-            ZIndex = 3
-        }, Panel)
-
+        -- Phần đầu cố định: avatar + tên
         local Avatar = New("ImageLabel", {
-            Size = UDim2.new(0, 54, 0, 54),
-            Position = UDim2.new(0.5, -27, 0, 28),
+            Size = UDim2.new(0, 34, 0, 34),
+            Position = UDim2.new(0, 8, 0, 7),
             BackgroundColor3 = BG_CONTROL,
             Image = "",
             ZIndex = 3
         }, Panel)
         Corner(Avatar, UDim.new(1, 0))
-        Stroke(Avatar, ACCENT, 1.5)
+        Stroke(Avatar, STROKE_COL, 1)
+
+        local vDisplay = New("TextLabel", {
+            Size = UDim2.new(1, -52, 0, 16),
+            Position = UDim2.new(0, 46, 0, 8),
+            BackgroundTransparency = 1,
+            Font = Enum.Font.GothamBold,
+            TextSize = 11,
+            TextXAlignment = Enum.TextXAlignment.Left,
+            TextTruncate = Enum.TextTruncate.AtEnd,
+            TextColor3 = TEXT_MAIN,
+            Text = lp.DisplayName,
+            ZIndex = 3
+        }, Panel)
+
+        New("TextLabel", {
+            Size = UDim2.new(1, -52, 0, 12),
+            Position = UDim2.new(0, 46, 0, 24),
+            BackgroundTransparency = 1,
+            Font = Enum.Font.Gotham,
+            TextSize = 9,
+            TextXAlignment = Enum.TextXAlignment.Left,
+            TextTruncate = Enum.TextTruncate.AtEnd,
+            TextColor3 = TEXT_DIM,
+            Text = "@" .. lp.Name,
+            ZIndex = 3
+        }, Panel)
+
+        New("Frame", {
+            Size = UDim2.new(1, -16, 0, 1),
+            Position = UDim2.new(0, 8, 0, 46),
+            BackgroundColor3 = STROKE_COL,
+            ZIndex = 3
+        }, Panel)
 
         local Scroll = New("ScrollingFrame", {
-            Size = UDim2.new(1, -8, 1, -92),
-            Position = UDim2.new(0, 4, 0, 88),
+            Size = UDim2.new(1, -8, 1, -54),
+            Position = UDim2.new(0, 4, 0, 50),
             BackgroundTransparency = 1,
             ScrollBarThickness = 2,
             ScrollBarImageColor3 = Color3.fromRGB(80, 85, 100),
@@ -808,13 +889,291 @@ function Library:CreateWindow(config)
         }, Panel)
         New("UIListLayout", { Padding = UDim.new(0, 4), SortOrder = Enum.SortOrder.LayoutOrder }, Scroll)
 
-        local rowOrder = 0
+        local order = 0
+        local function NextOrder()
+            order = order + 1
+            return order
+        end
+
+        local function Section(text)
+            New("TextLabel", {
+                Size = UDim2.new(1, -4, 0, 16),
+                BackgroundTransparency = 1,
+                Font = Enum.Font.GothamBold,
+                TextSize = 9,
+                TextXAlignment = Enum.TextXAlignment.Left,
+                TextColor3 = TEXT_DIM,
+                Text = text,
+                LayoutOrder = NextOrder(),
+                ZIndex = 4
+            }, Scroll)
+        end
+
+        -- ============ GIAO DIỆN: viền ============
+        Section("VIỀN MENU")
+
+        local RainbowRow = New("TextButton", {
+            Size = UDim2.new(1, -4, 0, 28),
+            BackgroundColor3 = BG_CONTROL,
+            Text = "",
+            AutoButtonColor = false,
+            LayoutOrder = NextOrder(),
+            ZIndex = 4
+        }, Scroll)
+        Corner(RainbowRow, UDim.new(0, 6))
+        New("TextLabel", {
+            Size = UDim2.new(1, -40, 1, 0),
+            Position = UDim2.new(0, 6, 0, 0),
+            BackgroundTransparency = 1,
+            Font = Enum.Font.GothamMedium,
+            TextSize = 10,
+            TextXAlignment = Enum.TextXAlignment.Left,
+            TextTruncate = Enum.TextTruncate.AtEnd,
+            TextColor3 = TEXT_MAIN,
+            Text = "Cầu vồng",
+            ZIndex = 5
+        }, RainbowRow)
+        local SwTrack = New("Frame", {
+            Size = UDim2.new(0, 26, 0, 14),
+            Position = UDim2.new(1, -32, 0.5, -7),
+            BackgroundColor3 = ACCENT,
+            ZIndex = 5
+        }, RainbowRow)
+        Corner(SwTrack, UDim.new(1, 0))
+        local SwKnob = New("Frame", {
+            Size = UDim2.new(0, 10, 0, 10),
+            Position = UDim2.new(1, -12, 0.5, -5),
+            BackgroundColor3 = WHITE,
+            ZIndex = 6
+        }, SwTrack)
+        Corner(SwKnob, UDim.new(1, 0))
+
+        local function UpdateSwitch()
+            Tween(SwTrack, fastInfo, { BackgroundColor3 = rainbowOn and ACCENT or BG_OFF })
+            Tween(SwKnob, fastInfo, { Position = rainbowOn and UDim2.new(1, -12, 0.5, -5) or UDim2.new(0, 2, 0.5, -5) })
+        end
+
+        -- Ô chọn màu viền
+        local SWATCH_COLORS = {
+            ACCENT,
+            Color3.fromRGB(150, 90, 255),
+            Color3.fromRGB(255, 95, 170),
+            Color3.fromRGB(255, 85, 85),
+            Color3.fromRGB(255, 150, 60),
+            Color3.fromRGB(255, 215, 70),
+            Color3.fromRGB(80, 220, 120),
+            WHITE,
+        }
+        local cell = math.max(14, math.floor((IN_W - 12) / 4))
+        local Grid = New("Frame", {
+            Size = UDim2.new(1, -4, 0, cell * 2 + 4),
+            BackgroundTransparency = 1,
+            LayoutOrder = NextOrder(),
+            ZIndex = 4
+        }, Scroll)
+        New("UIGridLayout", {
+            CellSize = UDim2.new(0, cell, 0, cell),
+            CellPadding = UDim2.new(0, 4, 0, 4),
+            SortOrder = Enum.SortOrder.LayoutOrder
+        }, Grid)
+
+        local swatches = {}
+        local function MarkSwatch(selected)
+            for _, s in ipairs(swatches) do
+                s.stroke.Transparency = (s.btn == selected) and 0 or 1
+            end
+        end
+
+        for i, col in ipairs(SWATCH_COLORS) do
+            local btn = New("TextButton", {
+                BackgroundColor3 = col,
+                Text = "",
+                AutoButtonColor = false,
+                LayoutOrder = i,
+                ZIndex = 5
+            }, Grid)
+            Corner(btn, UDim.new(0, 6))
+            local st = Stroke(btn, WHITE, 1.5, 1)
+            table.insert(swatches, { btn = btn, stroke = st })
+            btn.MouseButton1Click:Connect(function()
+                borderColor = col
+                SetRainbow(false)
+                UpdateSwitch()
+                MarkSwatch(btn)
+            end)
+        end
+
+        RainbowRow.MouseButton1Click:Connect(function()
+            SetRainbow(not rainbowOn)
+            UpdateSwitch()
+            if rainbowOn then MarkSwatch(nil) end
+        end)
+
+        -- ============ GIAO DIỆN: nền menu ============
+        Section("NỀN MENU")
+
+        local bgMode      = "icon"   -- icon | none | custom
+        local customImage = ""
+
+        local Tiles = New("Frame", {
+            Size = UDim2.new(1, -4, 0, 38),
+            BackgroundTransparency = 1,
+            LayoutOrder = NextOrder(),
+            ZIndex = 4
+        }, Scroll)
+
+        -- Ô 1: tự lấy ảnh của menu nhỏ
+        local TileIcon = New("ImageButton", {
+            Size = UDim2.new(0.5, -2, 1, 0),
+            BackgroundColor3 = BG_CONTROL,
+            Image = ToggleIcon.Image,
+            ScaleType = Enum.ScaleType.Crop,
+            AutoButtonColor = false,
+            ZIndex = 5
+        }, Tiles)
+        Corner(TileIcon, UDim.new(0, 6))
+        local TileIconStroke = Stroke(TileIcon, ACCENT, 1.5)
+        local TileCap = New("TextLabel", {
+            Size = UDim2.new(1, 0, 0, 13),
+            Position = UDim2.new(0, 0, 1, -13),
+            BackgroundColor3 = Color3.fromRGB(0, 0, 0),
+            BackgroundTransparency = 0.35,
+            Font = Enum.Font.GothamBold,
+            TextSize = 9,
+            TextColor3 = WHITE,
+            Text = "Menu nhỏ",
+            ZIndex = 6
+        }, TileIcon)
+        Corner(TileCap, UDim.new(0, 6))
+
+        -- Ô 2: nền trơn
+        local TileNone = New("TextButton", {
+            Size = UDim2.new(0.5, -2, 1, 0),
+            Position = UDim2.new(0.5, 2, 0, 0),
+            BackgroundColor3 = BG_CONTROL,
+            Font = Enum.Font.GothamMedium,
+            TextSize = 10,
+            TextColor3 = TEXT_MAIN,
+            Text = "Trơn",
+            AutoButtonColor = false,
+            ZIndex = 5
+        }, Tiles)
+        Corner(TileNone, UDim.new(0, 6))
+        local TileNoneStroke = Stroke(TileNone, STROKE_COL, 1)
+
+        local function RefreshTiles()
+            TileIconStroke.Color = (bgMode == "icon") and ACCENT or STROKE_COL
+            TileIconStroke.Thickness = (bgMode == "icon") and 1.5 or 1
+            TileNoneStroke.Color = (bgMode == "none") and ACCENT or STROKE_COL
+            TileNoneStroke.Thickness = (bgMode == "none") and 1.5 or 1
+        end
+
+        local function ApplyBg()
+            if bgMode == "none" then
+                BgImage.Visible = false
+            else
+                BgImage.Image = (bgMode == "icon") and ToggleIcon.Image or customImage
+                BgImage.Visible = true
+            end
+            RefreshTiles()
+        end
+
+        TileIcon.MouseButton1Click:Connect(function()
+            bgMode = "icon"
+            ApplyBg()
+        end)
+        TileNone.MouseButton1Click:Connect(function()
+            bgMode = "none"
+            ApplyBg()
+        end)
+        ToggleIcon:GetPropertyChangedSignal("Image"):Connect(function()
+            TileIcon.Image = ToggleIcon.Image
+            if bgMode == "icon" then ApplyBg() end
+        end)
+
+        -- Độ hiện của ảnh nền
+        local OpRow = New("Frame", {
+            Size = UDim2.new(1, -4, 0, 24),
+            BackgroundColor3 = BG_CONTROL,
+            LayoutOrder = NextOrder(),
+            ZIndex = 4
+        }, Scroll)
+        Corner(OpRow, UDim.new(0, 6))
+        local OpLabel = New("TextLabel", {
+            Size = UDim2.new(1, -48, 1, 0),
+            Position = UDim2.new(0, 24, 0, 0),
+            BackgroundTransparency = 1,
+            Font = Enum.Font.GothamBold,
+            TextSize = 10,
+            TextColor3 = TEXT_MAIN,
+            ZIndex = 5
+        }, OpRow)
+
+        local function RefreshOpacity()
+            OpLabel.Text = math.floor((1 - BgImage.ImageTransparency) * 100 + 0.5) .. "%"
+        end
+        local function StepOpacity(d)
+            BgImage.ImageTransparency = math.clamp(math.floor((BgImage.ImageTransparency + d) * 100 + 0.5) / 100, 0.3, 0.95)
+            RefreshOpacity()
+        end
+        local function StepButton(text, xPos, delta)
+            local b = New("TextButton", {
+                Size = UDim2.new(0, 22, 1, 0),
+                Position = xPos,
+                BackgroundTransparency = 1,
+                Font = Enum.Font.GothamBold,
+                TextSize = 14,
+                TextColor3 = ACCENT,
+                Text = text,
+                ZIndex = 5
+            }, OpRow)
+            b.MouseButton1Click:Connect(function() StepOpacity(delta) end)
+        end
+        StepButton("-", UDim2.new(0, 0, 0, 0), 0.1)   -- giảm độ hiện => tăng trong suốt
+        StepButton("+", UDim2.new(1, -22, 0, 0), -0.1)
+        RefreshOpacity()
+
+        -- Nhập ID ảnh tùy chọn
+        local IdBox = New("TextBox", {
+            Size = UDim2.new(1, -4, 0, 24),
+            BackgroundColor3 = BG_CONTROL,
+            Font = Enum.Font.Gotham,
+            TextSize = 10,
+            TextColor3 = TEXT_MAIN,
+            PlaceholderText = "ID ảnh + Enter",
+            PlaceholderColor3 = TEXT_DIM,
+            Text = "",
+            ClearTextOnFocus = false,
+            TextXAlignment = Enum.TextXAlignment.Left,
+            LayoutOrder = NextOrder(),
+            ZIndex = 5
+        }, Scroll)
+        Corner(IdBox, UDim.new(0, 6))
+        New("UIPadding", { PaddingLeft = UDim.new(0, 6), PaddingRight = UDim.new(0, 6) }, IdBox)
+
+        IdBox.FocusLost:Connect(function()
+            local t = (IdBox.Text:gsub("%s+", ""))
+            if t == "" then return end
+            if t:match("^%d+$") then t = "rbxassetid://" .. t end
+            if not t:match("^rbxassetid://%d+$") then
+                Library:Notify({ Type = "warning", Title = "Hình nền", Content = "ID ảnh không hợp lệ", Duration = 3, Silent = true })
+                return
+            end
+            customImage = t
+            bgMode = "custom"
+            ApplyBg()
+        end)
+
+        ApplyBg() -- mặc định: dùng ảnh của menu nhỏ làm nền menu lớn
+
+        -- ============ THÔNG TIN NGƯỜI CHƠI ============
+        Section("THÔNG TIN")
+
         local function Row(label)
-            rowOrder = rowOrder + 1
             local f = New("Frame", {
                 Size = UDim2.new(1, -4, 0, 32),
                 BackgroundColor3 = BG_CONTROL,
-                LayoutOrder = rowOrder,
+                LayoutOrder = NextOrder(),
                 ZIndex = 4
             }, Scroll)
             Corner(f, UDim.new(0, 6))
@@ -843,25 +1202,21 @@ function Library:CreateWindow(config)
             }, f)
         end
 
-        local vDisplay = Row("Tên hiển thị")
-        local vUser    = Row("Tài khoản")
-        local vId      = Row("User ID")
-        local vAge     = Row("Tuổi tài khoản")
-        local vMem     = Row("Gói")
-        local vTeam    = Row("Đội")
-        local vHp      = Row("Máu")
-        local vSpeed   = Row("Tốc độ chạy")
-        local vJump    = Row("Sức nhảy")
-        local vPos     = Row("Vị trí")
-        local vPing    = Row("Ping")
-        local vFps     = Row("FPS")
+        local vId    = Row("User ID")
+        local vAge   = Row("Tuổi tài khoản")
+        local vMem   = Row("Gói")
+        local vTeam  = Row("Đội")
+        local vHp    = Row("Máu")
+        local vSpeed = Row("Tốc độ chạy")
+        local vJump  = Row("Sức nhảy")
+        local vPos   = Row("Vị trí")
+        local vPing  = Row("Ping")
+        local vFps   = Row("FPS")
 
         -- Thông tin tĩnh: chỉ đặt 1 lần
-        vDisplay.Text = lp.DisplayName
-        vUser.Text    = "@" .. lp.Name
-        vId.Text      = tostring(lp.UserId)
-        vAge.Text     = lp.AccountAge .. " ngày"
-        vMem.Text     = (lp.MembershipType == Enum.MembershipType.Premium) and "Premium" or "Thường"
+        vId.Text  = tostring(lp.UserId)
+        vAge.Text = lp.AccountAge .. " ngày"
+        vMem.Text = (lp.MembershipType == Enum.MembershipType.Premium) and "Premium" or "Thường"
 
         task.spawn(function()
             local ok, img = pcall(function()
@@ -900,6 +1255,7 @@ function Library:CreateWindow(config)
             vPing.Text = okPing and (math.floor(ping * 1000) .. " ms") or "-"
         end
 
+        -- Mũi tên: khi thu nằm sát menu, khi mở dịch ra ngoài cùng bên phải panel
         local Arrow = New("TextButton", {
             Name = "InfoArrow",
             Size = UDim2.new(0, ARROW_W, 0, 64),
@@ -914,7 +1270,7 @@ function Library:CreateWindow(config)
             ZIndex = 6
         }, Dock)
         Corner(Arrow, UDim.new(0, 8))
-        Stroke(Arrow, ACCENT, 1.5)
+        table.insert(borderTargets, Stroke(Arrow, ACCENT, 1.5))
 
         -- Chỉ cập nhật số liệu mỗi 1 giây và chỉ khi tab đang mở (không tốn CPU khi thu lại)
         local function StartLive()
@@ -941,9 +1297,8 @@ function Library:CreateWindow(config)
         local function SetInfo(open)
             infoOpen = open
             Arrow.Text = open and "<" or ">"
-            Tween(Panel, TweenInfo.new(0.35, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
-                Position = UDim2.new(0, open and OPEN_X or CLOSED_X, 0, PAD)
-            })
+            Tween(Panel, slideInfo, { Position = UDim2.new(0, open and OPEN_X or CLOSED_X, 0, PAD) })
+            Tween(Arrow, slideInfo, { Position = UDim2.new(0, open and ARROW_OPEN_X or 0, 0.5, 0) })
             if open then StartLive() else StopLive() end
         end
 
