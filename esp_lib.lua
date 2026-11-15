@@ -46,6 +46,7 @@ ESP.ConnectionsTable     = {}
 ESP.Objects              = {}
 ESP.TotalObjects         = {}
 
+local RainbowConnection, EntityAlertConnection   -- khai báo trước để ESP:Unload() thấy được
 local RainbowState = { HueSetup = 0, Hue = 0, Step = 0, Color = Color3.new() }
 
 -- ============================================================
@@ -132,6 +133,7 @@ function ESP:AddESP(Params)
     local Object = Params.Object
     if ESP.ElementsEnabled[Object] or ESP.Unloaded then return end
     if not Object:IsA("BasePart") and not Object:IsA("Model") then return end
+    local AlwaysTracer = Params.AlwaysTracer and true or false   -- true: luôn kẻ đường nối (kể cả ngoài màn hình / sau lưng)
 
     ESP.ElementsEnabled[Object] = true
     ESP.TransparencyEnabled[Object] = false
@@ -206,7 +208,7 @@ function ESP:AddESP(Params)
             local HL = ESP.Highlights[Object]
             local Line = ESP.Lines[Object]
 
-            if Line and Line[1] then Line[1].Visible = OnScreen end
+            if Line and Line[1] then Line[1].Visible = OnScreen or AlwaysTracer end
             if Frame then
                 Frame.Visible = OnScreen
                 if OnScreen then Frame.Position = UDim2.fromOffset(SP.X, SP.Y) end
@@ -229,7 +231,7 @@ function ESP:AddESP(Params)
             if HL then
                 local Distance = math.floor((Camera.CFrame.Position - ObjPos).Magnitude)
                 local DText = ESP.ShowDistance and ("\n<font size='" .. math.round(ESP.TextSize * ESP.DistanceSizeRatio) .. "'>[" .. Distance .. "]</font>") or ""
-                if Label then Label.Text = ESP.TextTable[Object] .. DText end
+                if Label then Label.Text = (ESP.TextTable[Object] or "") .. DText end
                 HL.Enabled = true
                 HL.FillColor = ActiveColor
                 HL.OutlineColor = ESP.MatchColors and ActiveColor or ESP.OutlineColor
@@ -243,7 +245,7 @@ function ESP:AddESP(Params)
                 end
             end
 
-            if Line and HL and ESP.Tracers and OnScreen then
+            if Line and ESP.Tracers and ((HL and OnScreen) or AlwaysTracer) then
                 local SS = Camera.ViewportSize
                 local Origin
                 if ESP.TracerOrigin == "Center" then
@@ -257,6 +259,18 @@ function ESP:AddESP(Params)
                     Origin = Vector2.new(SS.X / 2, SS.Y)
                 end
                 local Dest = Vector2.new(SP.X, SP.Y)
+                if AlwaysTracer then
+                    -- ngoài màn hình / sau lưng: kẹp đầu đường vào mép màn hình để chỉ hướng
+                    local Center = Vector2.new(SS.X / 2, SS.Y / 2)
+                    local Dir = Dest - Center
+                    if SP.Z < 0 then Dir = -Dir end
+                    if Dir.Magnitude < 1 then Dir = Vector2.new(0, 1) end
+                    local SX = Dir.X ~= 0 and (Center.X - 24) / math.abs(Dir.X) or math.huge
+                    local SY = Dir.Y ~= 0 and (Center.Y - 24) / math.abs(Dir.Y) or math.huge
+                    local Scale = math.min(SX, SY)
+                    if SP.Z >= 0 then Scale = math.min(Scale, 1) end
+                    Dest = Center + Dir * Scale
+                end
                 local Mid = (Origin + Dest) / 2
                 local Rot = math.deg(math.atan2(Dest.Y - Origin.Y, Dest.X - Origin.X))
                 local Len = (Origin - Dest).Magnitude
@@ -362,7 +376,7 @@ end
 -- ============================================================
 -- RAINBOW
 -- ============================================================
-local RainbowConnection = RunService.RenderStepped:Connect(function(Dt)
+RainbowConnection = RunService.RenderStepped:Connect(function(Dt)
     RainbowState.Step = RainbowState.Step + Dt
     if RainbowState.Step >= 1 / 60 then
         RainbowState.Step = 0
@@ -469,7 +483,7 @@ function ESP:RefreshEntityAlertLabel()
     end
 end
 
-local EntityAlertConnection = RunService.Heartbeat:Connect(function()
+EntityAlertConnection = RunService.Heartbeat:Connect(function()
     local Now = tick()
     if Now - LastAlertUpdate < 0.1 then return end
     LastAlertUpdate = Now
