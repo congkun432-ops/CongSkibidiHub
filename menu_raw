@@ -1478,10 +1478,16 @@ function Library:CreateWindow(config)
             ------------------------------------------------------------
             function Api:AddSection(title, defaultOpen, callback, flag)
                 title = tostring(title or "Section")
-                local isOpen    = defaultOpen and true or false
-                local PAD_V     = 6
+                local isOpen      = defaultOpen and true or false
+                local PAD_V       = 6
+                local HEADER_H    = 34
+                local RIGHT_RESERVE = 68      -- chỗ dành cho badge + nút mũi tên bên phải
                 local heightTween = nil
-                local visToken  = 0
+                local visToken    = 0
+                local hovering    = false
+
+                local COL_HOVER = Color3.fromRGB(42, 48, 61)
+                local COL_PRESS = Color3.fromRGB(24, 27, 34)
 
                 local Holder = MakeRow(0)
                 Holder.Name = "Section"
@@ -1491,26 +1497,44 @@ function Library:CreateWindow(config)
                     SortOrder = Enum.SortOrder.LayoutOrder
                 }, Holder)
 
+                ------------------------------------------------------------
+                -- THANH TIÊU ĐỀ
+                ------------------------------------------------------------
                 local Header = New("TextButton", {
                     Name = "Header",
-                    Size = UDim2.new(1, 0, 0, 32),
-                    BackgroundColor3 = BG_TAB,
+                    Size = UDim2.new(1, 0, 0, HEADER_H),
+                    BackgroundColor3 = isOpen and BG_TAB_ON or BG_TAB,
                     Text = "",
                     AutoButtonColor = false,
                     LayoutOrder = 1,
                     ZIndex = 4
                 }, Holder)
-                Corner(Header, UDim.new(0, 6))
-                Stroke(Header, STROKE_COL, 1)
+                Corner(Header, UDim.new(0, 8))
+                local HeaderStroke = Stroke(Header, isOpen and ACCENT or STROKE_COL, 1, isOpen and 0.45 or 0)
+                New("UIGradient", {
+                    Color = ColorSequence.new(WHITE, Color3.fromRGB(205, 210, 222)),
+                    Rotation = 90
+                }, Header)
+
+                -- Thanh nhấn bên trái (dài ra + sáng lên khi mở)
+                local Bar = New("Frame", {
+                    Name = "AccentBar",
+                    AnchorPoint = Vector2.new(0, 0.5),
+                    Size = UDim2.new(0, 3, 0, isOpen and 16 or 8),
+                    Position = UDim2.new(0, 8, 0.5, 0),
+                    BackgroundColor3 = isOpen and ACCENT or STROKE_COL,
+                    ZIndex = 5
+                }, Header)
+                Corner(Bar, UDim.new(1, 0))
 
                 local TitleLbl = New("TextLabel", {
-                    Position = UDim2.new(0, 12, 0, 0),
+                    Position = UDim2.new(0, 20, 0, 0),
                     Size = UDim2.new(0, 80, 1, 0),
                     BackgroundTransparency = 1,
                     Text = title,
                     TextColor3 = isOpen and ACCENT or TEXT_MAIN,
                     Font = Enum.Font.GothamBold,
-                    TextSize = 12,
+                    TextSize = 13,
                     TextXAlignment = Enum.TextXAlignment.Left,
                     TextTruncate = Enum.TextTruncate.AtEnd,
                     ZIndex = 5
@@ -1521,35 +1545,69 @@ function Library:CreateWindow(config)
                     Size = UDim2.new(1, -120, 0, 1),
                     Position = UDim2.new(0, 100, 0.5, 0),
                     BackgroundColor3 = STROKE_COL,
+                    BackgroundTransparency = 0.35,
                     ZIndex = 5
                 }, Header)
 
-                local Arrow = New("TextLabel", {
-                    AnchorPoint = Vector2.new(0.5, 0.5),
-                    Size = UDim2.new(0, 20, 0, 20),
-                    Position = UDim2.new(1, -18, 0.5, 0),
-                    BackgroundTransparency = 1,
-                    Text = "▼",
-                    TextColor3 = ACCENT,
-                    Font = Enum.Font.GothamBold,
-                    TextSize = 10,
-                    Rotation = isOpen and 0 or -90,
+                -- Huy hiệu hiển thị số chức năng bên trong
+                local Badge = New("Frame", {
+                    Name = "Badge",
+                    AnchorPoint = Vector2.new(1, 0.5),
+                    Size = UDim2.new(0, 24, 0, 18),
+                    Position = UDim2.new(1, -36, 0.5, 0),
+                    BackgroundColor3 = BG_CONTROL,
                     ZIndex = 5
                 }, Header)
+                Corner(Badge, UDim.new(1, 0))
+                local BadgeLbl = New("TextLabel", {
+                    Size = UDim2.new(1, 0, 1, 0),
+                    BackgroundTransparency = 1,
+                    Text = "0",
+                    TextColor3 = isOpen and ACCENT or TEXT_DIM,
+                    Font = Enum.Font.GothamBold,
+                    TextSize = 10,
+                    ZIndex = 6
+                }, Badge)
+
+                -- Nút mũi tên dạng chip bo tròn
+                local Chip = New("Frame", {
+                    Name = "Chip",
+                    AnchorPoint = Vector2.new(1, 0.5),
+                    Size = UDim2.new(0, 22, 0, 22),
+                    Position = UDim2.new(1, -8, 0.5, 0),
+                    BackgroundColor3 = isOpen and ACCENT or BG_CONTROL,
+                    ZIndex = 5
+                }, Header)
+                Corner(Chip, UDim.new(0, 7))
+                local Arrow = New("TextLabel", {
+                    AnchorPoint = Vector2.new(0.5, 0.5),
+                    Size = UDim2.new(1, 0, 1, 0),
+                    Position = UDim2.new(0.5, 0, 0.5, 0),
+                    BackgroundTransparency = 1,
+                    Text = "▼",
+                    TextColor3 = isOpen and BG_MAIN or ACCENT,
+                    Font = Enum.Font.GothamBold,
+                    TextSize = 9,
+                    Rotation = isOpen and 0 or -90,
+                    ZIndex = 6
+                }, Chip)
 
                 local function LayoutHeader()
                     local ok, b = pcall(function()
-                        return TextService:GetTextSize(title, 12, Enum.Font.GothamBold, Vector2.new(1000, 40))
+                        return TextService:GetTextSize(title, 13, Enum.Font.GothamBold, Vector2.new(1000, 40))
                     end)
-                    local w = math.min((ok and b and b.X) or 80, 140)
+                    local w = math.min((ok and b and b.X) or 80, 150)
                     TitleLbl.Text = title
                     TitleLbl.Size = UDim2.new(0, w + 2, 1, 0)
-                    Line.Position = UDim2.new(0, 12 + w + 10, 0.5, 0)
-                    Line.Size = UDim2.new(1, -(12 + w + 10 + 36), 0, 1)
+                    Line.Position = UDim2.new(0, 20 + w + 10, 0.5, 0)
+                    Line.Size = UDim2.new(1, -(20 + w + 10 + RIGHT_RESERVE), 0, 1)
                 end
                 LayoutHeader()
 
-                local Body = New("Frame", {
+                ------------------------------------------------------------
+                -- THÂN SECTION (có đường dẫn thụt lề bên trái)
+                ------------------------------------------------------------
+                local Wrap = New("Frame", {
                     Name = "Body",
                     Size = UDim2.new(1, 0, 0, 0),
                     BackgroundColor3 = BG_PANEL,
@@ -1559,17 +1617,47 @@ function Library:CreateWindow(config)
                     LayoutOrder = 2,
                     ZIndex = 4
                 }, Holder)
-                Corner(Body, UDim.new(0, 6))
+                Corner(Wrap, UDim.new(0, 8))
+
+                local Guide = New("Frame", {
+                    Name = "Guide",
+                    Position = UDim2.new(0, 9, 0, PAD_V),
+                    Size = UDim2.new(0, 2, 1, -PAD_V * 2),
+                    BackgroundColor3 = ACCENT,
+                    BackgroundTransparency = 0.6,
+                    ZIndex = 4
+                }, Wrap)
+                Corner(Guide, UDim.new(1, 0))
+
+                -- Body = nơi chứa control (GetContainer trả về Frame này)
+                local Body = New("Frame", {
+                    Name = "Content",
+                    Position = UDim2.new(0, 17, 0, 0),
+                    Size = UDim2.new(1, -23, 1, 0),
+                    BackgroundTransparency = 1,
+                    ZIndex = 4
+                }, Wrap)
                 New("UIPadding", {
                     PaddingTop = UDim.new(0, PAD_V),
-                    PaddingBottom = UDim.new(0, PAD_V),
-                    PaddingLeft = UDim.new(0, 6),
-                    PaddingRight = UDim.new(0, 6)
+                    PaddingBottom = UDim.new(0, PAD_V)
                 }, Body)
                 local ContentLayout = New("UIListLayout", {
                     Padding = UDim.new(0, 6),
                     SortOrder = Enum.SortOrder.LayoutOrder
                 }, Body)
+
+                -- Cập nhật số chức năng trên huy hiệu
+                local function RefreshBadge()
+                    local n = 0
+                    for _, c in ipairs(Body:GetChildren()) do
+                        if c:IsA("GuiObject") then n = n + 1 end
+                    end
+                    BadgeLbl.Text = tostring(n)
+                    Badge.Visible = n > 0
+                end
+                Body.ChildAdded:Connect(function() task.defer(RefreshBadge) end)
+                Body.ChildRemoved:Connect(function() task.defer(RefreshBadge) end)
+                RefreshBadge()
 
                 local function TargetHeight()
                     local h = ContentLayout.AbsoluteContentSize.Y
@@ -1578,6 +1666,11 @@ function Library:CreateWindow(config)
                 end
 
                 local animInfo = TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+                local fastInfo = TweenInfo.new(0.2)
+
+                local function BaseColor()
+                    return isOpen and BG_TAB_ON or BG_TAB
+                end
 
                 local function Apply(v, animate)
                     isOpen = v and true or false
@@ -1590,36 +1683,56 @@ function Library:CreateWindow(config)
                         heightTween = nil
                     end
 
-                    local arrowRot = isOpen and 0 or -90
-                    local titleCol = isOpen and ACCENT or TEXT_MAIN
-
+                    -- Chiều cao thân
                     if isOpen then
-                        Body.Visible = true
+                        Wrap.Visible = true
                         if animate then
-                            heightTween = Tween(Body, animInfo, { Size = UDim2.new(1, 0, 0, TargetHeight()) })
+                            heightTween = Tween(Wrap, animInfo, { Size = UDim2.new(1, 0, 0, TargetHeight()) })
                         else
-                            Body.Size = UDim2.new(1, 0, 0, TargetHeight())
+                            Wrap.Size = UDim2.new(1, 0, 0, TargetHeight())
                         end
                     else
                         if animate then
-                            heightTween = Tween(Body, animInfo, { Size = UDim2.new(1, 0, 0, 0) })
+                            heightTween = Tween(Wrap, animInfo, { Size = UDim2.new(1, 0, 0, 0) })
                             task.delay(0.27, function()
-                                if visToken == token and not isOpen and Body and Body.Parent then
-                                    Body.Visible = false
+                                if visToken == token and not isOpen and Wrap and Wrap.Parent then
+                                    Wrap.Visible = false
                                 end
                             end)
                         else
-                            Body.Size = UDim2.new(1, 0, 0, 0)
-                            Body.Visible = false
+                            Wrap.Size = UDim2.new(1, 0, 0, 0)
+                            Wrap.Visible = false
                         end
                     end
 
+                    -- Màu sắc / hiệu ứng thanh tiêu đề
+                    local arrowRot = isOpen and 0 or -90
+                    local hdrColor = hovering and COL_HOVER or BaseColor()
                     if animate then
-                        Tween(Arrow, animInfo, { Rotation = arrowRot })
-                        Tween(TitleLbl, TweenInfo.new(0.2), { TextColor3 = titleCol })
+                        Tween(Arrow, animInfo, { Rotation = arrowRot, TextColor3 = isOpen and BG_MAIN or ACCENT })
+                        Tween(Chip, fastInfo, { BackgroundColor3 = isOpen and ACCENT or BG_CONTROL })
+                        Tween(TitleLbl, fastInfo, { TextColor3 = isOpen and ACCENT or TEXT_MAIN })
+                        Tween(BadgeLbl, fastInfo, { TextColor3 = isOpen and ACCENT or TEXT_DIM })
+                        Tween(Bar, animInfo, {
+                            Size = UDim2.new(0, 3, 0, isOpen and 16 or 8),
+                            BackgroundColor3 = isOpen and ACCENT or STROKE_COL
+                        })
+                        Tween(HeaderStroke, fastInfo, {
+                            Color = isOpen and ACCENT or STROKE_COL,
+                            Transparency = isOpen and 0.45 or 0
+                        })
+                        Tween(Header, fastInfo, { BackgroundColor3 = hdrColor })
                     else
                         Arrow.Rotation = arrowRot
-                        TitleLbl.TextColor3 = titleCol
+                        Arrow.TextColor3 = isOpen and BG_MAIN or ACCENT
+                        Chip.BackgroundColor3 = isOpen and ACCENT or BG_CONTROL
+                        TitleLbl.TextColor3 = isOpen and ACCENT or TEXT_MAIN
+                        BadgeLbl.TextColor3 = isOpen and ACCENT or TEXT_DIM
+                        Bar.Size = UDim2.new(0, 3, 0, isOpen and 16 or 8)
+                        Bar.BackgroundColor3 = isOpen and ACCENT or STROKE_COL
+                        HeaderStroke.Color = isOpen and ACCENT or STROKE_COL
+                        HeaderStroke.Transparency = isOpen and 0.45 or 0
+                        Header.BackgroundColor3 = hdrColor
                     end
                 end
 
@@ -1630,15 +1743,23 @@ function Library:CreateWindow(config)
                             heightTween:Cancel()
                             heightTween = nil
                         end
-                        Body.Size = UDim2.new(1, 0, 0, TargetHeight())
+                        Wrap.Size = UDim2.new(1, 0, 0, TargetHeight())
                     end
                 end)
 
                 Header.MouseEnter:Connect(function()
-                    Tween(Header, TweenInfo.new(0.15), { BackgroundColor3 = BG_TAB_ON })
+                    hovering = true
+                    Tween(Header, TweenInfo.new(0.15), { BackgroundColor3 = COL_HOVER })
                 end)
                 Header.MouseLeave:Connect(function()
-                    Tween(Header, TweenInfo.new(0.15), { BackgroundColor3 = BG_TAB })
+                    hovering = false
+                    Tween(Header, TweenInfo.new(0.15), { BackgroundColor3 = BaseColor() })
+                end)
+                Header.MouseButton1Down:Connect(function()
+                    Tween(Header, TweenInfo.new(0.08), { BackgroundColor3 = COL_PRESS })
+                end)
+                Header.MouseButton1Up:Connect(function()
+                    Tween(Header, TweenInfo.new(0.12), { BackgroundColor3 = hovering and COL_HOVER or BaseColor() })
                 end)
 
                 Header.MouseButton1Click:Connect(function()
