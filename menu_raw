@@ -75,6 +75,109 @@ local function Tween(inst, info, props)
     return t
 end
 
+-- ===================== THÀNH PHẦN DÙNG CHUNG: SWITCH + TEXTBOX =====================
+-- Switch phẳng: nền xám khi tắt, màu nhấn khi bật; bi trắng co giãn nhẹ khi nhấn.
+local function MakeSwitch(parent, pos, initial, z, w, h)
+    w = w or 36
+    h = h or 20
+    local kn    = h - 6
+    local grow  = math.floor(kn * 0.3 + 0.5)
+    local state = initial and true or false
+
+    local function KnobPos(on, width)
+        local y = -math.floor(kn / 2)
+        if on then return UDim2.new(1, -(width + 3), 0.5, y) end
+        return UDim2.new(0, 3, 0.5, y)
+    end
+
+    local Track = New("Frame", {
+        Size = UDim2.new(0, w, 0, h),
+        Position = pos,
+        BackgroundColor3 = state and ACCENT or BG_OFF,
+        ZIndex = z
+    }, parent)
+    Corner(Track, UDim.new(1, 0))
+    local TrackStroke = Stroke(Track, STROKE_COL, 1, state and 1 or 0)
+
+    local Knob = New("Frame", {
+        Size = UDim2.new(0, kn, 0, kn),
+        Position = KnobPos(state, kn),
+        BackgroundColor3 = state and WHITE or TEXT_DIM,
+        ZIndex = z + 1
+    }, Track)
+    Corner(Knob, UDim.new(1, 0))
+
+    local moveInfo  = TweenInfo.new(0.18, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+    local pressInfo = TweenInfo.new(0.1, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+
+    local sw = { Track = Track }
+
+    function sw.Set(v)
+        state = v and true or false
+        Tween(Track, moveInfo, { BackgroundColor3 = state and ACCENT or BG_OFF })
+        Tween(TrackStroke, moveInfo, { Transparency = state and 1 or 0 })
+        Tween(Knob, moveInfo, {
+            Position = KnobPos(state, kn),
+            Size = UDim2.new(0, kn, 0, kn),
+            BackgroundColor3 = state and WHITE or TEXT_DIM
+        })
+    end
+
+    function sw.Press(down)
+        local width = down and (kn + grow) or kn
+        Tween(Knob, pressInfo, { Size = UDim2.new(0, width, 0, kn), Position = KnobPos(state, width) })
+    end
+
+    function sw.Get() return state end
+
+    -- Gắn hiệu ứng nhấn cho 1 nút bất kỳ (cả hàng bấm được)
+    function sw.Bind(btn)
+        btn.MouseButton1Down:Connect(function() sw.Press(true) end)
+        btn.MouseButton1Up:Connect(function() sw.Press(false) end)
+        btn.MouseLeave:Connect(function() sw.Press(false) end)
+    end
+
+    return sw
+end
+
+-- Ô nhập tối giản: nền lõm tối, viền chuyển màu nhấn khi focus, tự bôi đen chữ khi focus.
+local function MakeInput(parent, props)
+    local p = {
+        BackgroundColor3 = BG_MAIN,
+        TextColor3 = TEXT_MAIN,
+        PlaceholderColor3 = Color3.fromRGB(110, 116, 130),
+        Font = Enum.Font.GothamMedium,
+        TextSize = 12,
+        Text = "",
+        ClearTextOnFocus = false,
+        ClipsDescendants = true,
+        TextXAlignment = Enum.TextXAlignment.Left,
+        ZIndex = 5
+    }
+    for k, v in pairs(props or {}) do p[k] = v end
+
+    local Input = New("TextBox", p, parent)
+    Corner(Input, UDim.new(0, 7))
+    local st = Stroke(Input, STROKE_COL, 1)
+    New("UIPadding", { PaddingLeft = UDim.new(0, 8), PaddingRight = UDim.new(0, 8) }, Input)
+
+    local info = TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+    Input.Focused:Connect(function()
+        Tween(st, info, { Color = ACCENT })
+        task.defer(function()
+            pcall(function()
+                Input.CursorPosition = #Input.Text + 1
+                Input.SelectionStart = 1
+            end)
+        end)
+    end)
+    Input.FocusLost:Connect(function()
+        Tween(st, info, { Color = STROKE_COL })
+    end)
+
+    return Input, st
+end
+
 local function SafeCall(cb, ...)
     if type(cb) ~= "function" then return end
     local ok, err = pcall(cb, ...)
@@ -922,7 +1025,7 @@ function Library:CreateWindow(config)
         }, Scroll)
         Corner(RainbowRow, UDim.new(0, 6))
         New("TextLabel", {
-            Size = UDim2.new(1, -40, 1, 0),
+            Size = UDim2.new(1, -36, 1, 0),
             Position = UDim2.new(0, 6, 0, 0),
             BackgroundTransparency = 1,
             Font = Enum.Font.GothamMedium,
@@ -933,24 +1036,10 @@ function Library:CreateWindow(config)
             Text = "Cầu vồng",
             ZIndex = 5
         }, RainbowRow)
-        local SwTrack = New("Frame", {
-            Size = UDim2.new(0, 26, 0, 14),
-            Position = UDim2.new(1, -32, 0.5, -7),
-            BackgroundColor3 = ACCENT,
-            ZIndex = 5
-        }, RainbowRow)
-        Corner(SwTrack, UDim.new(1, 0))
-        local SwKnob = New("Frame", {
-            Size = UDim2.new(0, 10, 0, 10),
-            Position = UDim2.new(1, -12, 0.5, -5),
-            BackgroundColor3 = WHITE,
-            ZIndex = 6
-        }, SwTrack)
-        Corner(SwKnob, UDim.new(1, 0))
-
+        local RainbowSwitch = MakeSwitch(RainbowRow, UDim2.new(1, -32, 0.5, -7), true, 5, 26, 14)
+        RainbowSwitch.Bind(RainbowRow)
         local function UpdateSwitch()
-            Tween(SwTrack, fastInfo, { BackgroundColor3 = rainbowOn and ACCENT or BG_OFF })
-            Tween(SwKnob, fastInfo, { Position = rainbowOn and UDim2.new(1, -12, 0.5, -5) or UDim2.new(0, 2, 0.5, -5) })
+            RainbowSwitch.Set(rainbowOn)
         end
 
         -- Ô chọn màu viền
@@ -1134,22 +1223,12 @@ function Library:CreateWindow(config)
         RefreshOpacity()
 
         -- Nhập ID ảnh tùy chọn
-        local IdBox = New("TextBox", {
-            Size = UDim2.new(1, -4, 0, 24),
-            BackgroundColor3 = BG_CONTROL,
-            Font = Enum.Font.Gotham,
+        local IdBox = MakeInput(Scroll, {
+            Size = UDim2.new(1, -4, 0, 26),
             TextSize = 10,
-            TextColor3 = TEXT_MAIN,
             PlaceholderText = "ID ảnh + Enter",
-            PlaceholderColor3 = TEXT_DIM,
-            Text = "",
-            ClearTextOnFocus = false,
-            TextXAlignment = Enum.TextXAlignment.Left,
-            LayoutOrder = NextOrder(),
-            ZIndex = 5
-        }, Scroll)
-        Corner(IdBox, UDim.new(0, 6))
-        New("UIPadding", { PaddingLeft = UDim.new(0, 6), PaddingRight = UDim.new(0, 6) }, IdBox)
+            LayoutOrder = NextOrder()
+        })
 
         IdBox.FocusLost:Connect(function()
             local t = (IdBox.Text:gsub("%s+", ""))
@@ -1613,25 +1692,7 @@ function Library:CreateWindow(config)
                 local Row = MakeRow(38)
                 MakeLabel(Row, labelText, 0.6)
 
-                local state = default and true or false
-                local POS_ON  = UDim2.new(1, -18, 0.5, -7)
-                local POS_OFF = UDim2.new(0, 3, 0.5, -7)
-
-                local BG = New("Frame", {
-                    Size = UDim2.new(0, 38, 0, 20),
-                    Position = UDim2.new(1, -45, 0.5, -10),
-                    BackgroundColor3 = state and ACCENT_DARK or BG_OFF,
-                    ZIndex = 4
-                }, Row)
-                Corner(BG, UDim.new(1, 0))
-
-                local Ball = New("Frame", {
-                    Size = UDim2.new(0, 14, 0, 14),
-                    Position = state and POS_ON or POS_OFF,
-                    BackgroundColor3 = WHITE,
-                    ZIndex = 5
-                }, BG)
-                Corner(Ball, UDim.new(1, 0))
+                local sw = MakeSwitch(Row, UDim2.new(1, -46, 0.5, -10), default, 4)
 
                 local ClickBtn = New("TextButton", {
                     Size = UDim2.new(1, 0, 1, 0),
@@ -1639,24 +1700,19 @@ function Library:CreateWindow(config)
                     Text = "",
                     ZIndex = 5
                 }, Row)
-
-                local function Apply(v)
-                    state = v and true or false
-                    Tween(Ball, TweenInfo.new(0.2), { Position = state and POS_ON or POS_OFF })
-                    Tween(BG, TweenInfo.new(0.2), { BackgroundColor3 = state and ACCENT_DARK or BG_OFF })
-                end
+                sw.Bind(ClickBtn)
 
                 ClickBtn.MouseButton1Click:Connect(function()
-                    Apply(not state)
-                    SafeCall(callback, state)
+                    sw.Set(not sw.Get())
+                    SafeCall(callback, sw.Get())
                 end)
 
                 local obj = {}
                 function obj:Set(v)
-                    Apply(v)
-                    SafeCall(callback, state)
+                    sw.Set(v)
+                    SafeCall(callback, sw.Get())
                 end
-                function obj:Get() return state end
+                function obj:Get() return sw.Get() end
                 return Register(flag, obj)
             end
 
@@ -1666,22 +1722,12 @@ function Library:CreateWindow(config)
 
                 local lastValue = default ~= nil and tostring(default) or ""
 
-                local Input = New("TextBox", {
-                    Size = UDim2.new(0, 75, 0, 26),
-                    Position = UDim2.new(1, -80, 0.5, -13),
-                    BackgroundColor3 = BG_CONTROL,
-                    TextColor3 = ACCENT,
+                local Input = MakeInput(Row, {
+                    Size = UDim2.new(0.45, -6, 0, 26),
+                    Position = UDim2.new(0.55, 0, 0.5, -13),
                     PlaceholderText = placeholder or "...",
-                    PlaceholderColor3 = Color3.fromRGB(100, 105, 115),
-                    Text = lastValue,
-                    TextSize = 12,
-                    Font = Enum.Font.GothamBold,
-                    ClearTextOnFocus = true,
-                    ClipsDescendants = true,
-                    ZIndex = 5
-                }, Row)
-                Corner(Input, UDim.new(0, 6))
-                Stroke(Input, STROKE_COL, 1)
+                    Text = lastValue
+                })
 
                 Input.FocusLost:Connect(function()
                     if Input.Text == "" then
