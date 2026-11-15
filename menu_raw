@@ -741,6 +741,235 @@ function Library:CreateWindow(config)
     CloseBtn.MouseButton1Click:Connect(CloseMenu)
     MinimizeBtn.MouseButton1Click:Connect(MinimizeMenu)
 
+    -- ===================== TAB THÔNG TIN NGƯỜI CHƠI (bên phải menu) =====================
+    do
+        local lp       = Players.LocalPlayer
+        local ARROW_W  = 22
+        local GAP      = 4
+        local PAD      = 3
+        local INFO_W   = math.max(88, math.floor(FULL_W / 3) - 10) -- nhỏ hơn 1/3 menu chính
+        local DOCK_W   = ARROW_W + GAP + INFO_W + 4
+        local CLOSED_X = -INFO_W - 6
+        local OPEN_X   = ARROW_W + GAP
+        local infoOpen = false
+        local fpsConn  = nil
+
+        -- Dock cắt phần panel đang thu lại; nằm ngoài MainFrame (MainFrame có ClipsDescendants)
+        local Dock = New("Frame", {
+            Name = "InfoDock",
+            Size = UDim2.new(0, DOCK_W, 0, FULL_H + PAD * 2),
+            BackgroundTransparency = 1,
+            ClipsDescendants = true,
+            Active = false,
+            Visible = false,
+            ZIndex = 2
+        }, ScreenGui)
+
+        local Panel = New("Frame", {
+            Name = "InfoPanel",
+            Size = UDim2.new(0, INFO_W, 1, -PAD * 2),
+            Position = UDim2.new(0, CLOSED_X, 0, PAD),
+            BackgroundColor3 = BG_MAIN,
+            ZIndex = 2
+        }, Dock)
+        Corner(Panel, UDim.new(0, 10))
+        Stroke(Panel, ACCENT, 1.5)
+
+        New("TextLabel", {
+            Size = UDim2.new(1, 0, 0, 26),
+            BackgroundTransparency = 1,
+            Font = Enum.Font.GothamBold,
+            TextSize = 12,
+            TextColor3 = ACCENT,
+            Text = "👤 Thông Tin",
+            ZIndex = 3
+        }, Panel)
+
+        local Avatar = New("ImageLabel", {
+            Size = UDim2.new(0, 54, 0, 54),
+            Position = UDim2.new(0.5, -27, 0, 28),
+            BackgroundColor3 = BG_CONTROL,
+            Image = "",
+            ZIndex = 3
+        }, Panel)
+        Corner(Avatar, UDim.new(1, 0))
+        Stroke(Avatar, ACCENT, 1.5)
+
+        local Scroll = New("ScrollingFrame", {
+            Size = UDim2.new(1, -8, 1, -92),
+            Position = UDim2.new(0, 4, 0, 88),
+            BackgroundTransparency = 1,
+            ScrollBarThickness = 2,
+            ScrollBarImageColor3 = Color3.fromRGB(80, 85, 100),
+            CanvasSize = UDim2.new(0, 0, 0, 0),
+            AutomaticCanvasSize = Enum.AutomaticSize.Y,
+            ScrollingDirection = Enum.ScrollingDirection.Y,
+            ZIndex = 3
+        }, Panel)
+        New("UIListLayout", { Padding = UDim.new(0, 4), SortOrder = Enum.SortOrder.LayoutOrder }, Scroll)
+
+        local rowOrder = 0
+        local function Row(label)
+            rowOrder = rowOrder + 1
+            local f = New("Frame", {
+                Size = UDim2.new(1, -4, 0, 32),
+                BackgroundColor3 = BG_CONTROL,
+                LayoutOrder = rowOrder,
+                ZIndex = 4
+            }, Scroll)
+            Corner(f, UDim.new(0, 6))
+            New("TextLabel", {
+                Size = UDim2.new(1, -10, 0, 12),
+                Position = UDim2.new(0, 6, 0, 3),
+                BackgroundTransparency = 1,
+                Font = Enum.Font.Gotham,
+                TextSize = 10,
+                TextXAlignment = Enum.TextXAlignment.Left,
+                TextColor3 = TEXT_DIM,
+                Text = label,
+                ZIndex = 5
+            }, f)
+            return New("TextLabel", {
+                Size = UDim2.new(1, -10, 0, 14),
+                Position = UDim2.new(0, 6, 0, 15),
+                BackgroundTransparency = 1,
+                Font = Enum.Font.GothamBold,
+                TextSize = 12,
+                TextXAlignment = Enum.TextXAlignment.Left,
+                TextTruncate = Enum.TextTruncate.AtEnd,
+                TextColor3 = TEXT_MAIN,
+                Text = "-",
+                ZIndex = 5
+            }, f)
+        end
+
+        local vDisplay = Row("Tên hiển thị")
+        local vUser    = Row("Tài khoản")
+        local vId      = Row("User ID")
+        local vAge     = Row("Tuổi tài khoản")
+        local vMem     = Row("Gói")
+        local vTeam    = Row("Đội")
+        local vHp      = Row("Máu")
+        local vSpeed   = Row("Tốc độ chạy")
+        local vJump    = Row("Sức nhảy")
+        local vPos     = Row("Vị trí")
+        local vPing    = Row("Ping")
+        local vFps     = Row("FPS")
+
+        -- Thông tin tĩnh: chỉ đặt 1 lần
+        vDisplay.Text = lp.DisplayName
+        vUser.Text    = "@" .. lp.Name
+        vId.Text      = tostring(lp.UserId)
+        vAge.Text     = lp.AccountAge .. " ngày"
+        vMem.Text     = (lp.MembershipType == Enum.MembershipType.Premium) and "Premium" or "Thường"
+
+        task.spawn(function()
+            local ok, img = pcall(function()
+                return Players:GetUserThumbnailAsync(lp.UserId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size100x100)
+            end)
+            if ok and img and Avatar.Parent then Avatar.Image = img end
+        end)
+
+        local function Refresh()
+            local char = lp.Character
+            local hum  = char and char:FindFirstChildOfClass("Humanoid")
+            local root = char and char:FindFirstChild("HumanoidRootPart")
+
+            vTeam.Text = lp.Team and lp.Team.Name or "Không có"
+
+            if hum then
+                vHp.Text    = string.format("%d / %d", math.floor(hum.Health + 0.5), math.floor(hum.MaxHealth + 0.5))
+                vSpeed.Text = tostring(math.floor(hum.WalkSpeed * 10 + 0.5) / 10)
+                if hum.UseJumpPower then
+                    vJump.Text = tostring(math.floor(hum.JumpPower * 10 + 0.5) / 10)
+                else
+                    vJump.Text = tostring(math.floor(hum.JumpHeight * 10 + 0.5) / 10)
+                end
+            else
+                vHp.Text, vSpeed.Text, vJump.Text = "-", "-", "-"
+            end
+
+            if root then
+                local p = root.Position
+                vPos.Text = string.format("%d  %d  %d", math.floor(p.X + 0.5), math.floor(p.Y + 0.5), math.floor(p.Z + 0.5))
+            else
+                vPos.Text = "-"
+            end
+
+            local okPing, ping = pcall(function() return lp:GetNetworkPing() end)
+            vPing.Text = okPing and (math.floor(ping * 1000) .. " ms") or "-"
+        end
+
+        local Arrow = New("TextButton", {
+            Name = "InfoArrow",
+            Size = UDim2.new(0, ARROW_W, 0, 64),
+            AnchorPoint = Vector2.new(0, 0.5),
+            Position = UDim2.new(0, 0, 0.5, 0),
+            BackgroundColor3 = BG_MAIN,
+            Text = ">",
+            TextColor3 = ACCENT,
+            Font = Enum.Font.GothamBold,
+            TextSize = 16,
+            AutoButtonColor = false,
+            ZIndex = 6
+        }, Dock)
+        Corner(Arrow, UDim.new(0, 8))
+        Stroke(Arrow, ACCENT, 1.5)
+
+        -- Chỉ cập nhật số liệu mỗi 1 giây và chỉ khi tab đang mở (không tốn CPU khi thu lại)
+        local function StartLive()
+            if fpsConn then return end
+            local frames, acc = 0, 0
+            Refresh()
+            fpsConn = Track(RunService.Heartbeat:Connect(function(dt)
+                frames = frames + 1
+                acc = acc + dt
+                if acc < 1 then return end
+                vFps.Text = math.floor(frames / acc + 0.5) .. " FPS"
+                frames, acc = 0, 0
+                Refresh()
+            end))
+        end
+
+        local function StopLive()
+            if fpsConn then
+                fpsConn:Disconnect()
+                fpsConn = nil
+            end
+        end
+
+        local function SetInfo(open)
+            infoOpen = open
+            Arrow.Text = open and "<" or ">"
+            Tween(Panel, TweenInfo.new(0.35, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
+                Position = UDim2.new(0, open and OPEN_X or CLOSED_X, 0, PAD)
+            })
+            if open then StartLive() else StopLive() end
+        end
+
+        Arrow.MouseButton1Click:Connect(function()
+            SetInfo(not infoOpen)
+        end)
+
+        -- Bám theo MainFrame (sự kiện, không polling). Chỉ hiện khi menu đã mở đủ kích thước.
+        local function Sync()
+            local sz, pos = MainFrame.Size, MainFrame.Position
+            local ready = MainFrame.Visible and sz.X.Offset >= FULL_W - 2 and sz.Y.Offset >= FULL_H - 2
+            if Dock.Visible ~= ready then Dock.Visible = ready end
+            if ready then
+                Dock.Position = UDim2.new(pos.X.Scale, pos.X.Offset + sz.X.Offset, pos.Y.Scale, pos.Y.Offset - PAD)
+                if infoOpen then StartLive() end
+            else
+                StopLive()
+            end
+        end
+
+        MainFrame:GetPropertyChangedSignal("Position"):Connect(Sync)
+        MainFrame:GetPropertyChangedSignal("Size"):Connect(Sync)
+        MainFrame:GetPropertyChangedSignal("Visible"):Connect(Sync)
+        Sync()
+    end
+
     if ToggleKey then
         Track(UserInputService.InputBegan:Connect(function(input, processed)
             if processed or UserInputService:GetFocusedTextBox() then return end
