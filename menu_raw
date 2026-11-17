@@ -30,10 +30,10 @@ local TEXT_DIM    = Color3.fromRGB(150, 155, 165)
 local WHITE       = Color3.fromRGB(255, 255, 255)
 
 local NOTIFY_TYPES = {
-    info    = { Color = Color3.fromRGB(0, 212, 255),  Icon = "ℹ", Title = "Thông Báo" },
-    success = { Color = Color3.fromRGB(80, 220, 120), Icon = "✔", Title = "Thành Công" },
-    warning = { Color = Color3.fromRGB(255, 190, 60), Icon = "⚠", Title = "Cảnh Báo" },
-    error   = { Color = Color3.fromRGB(255, 85, 85),  Icon = "✖", Title = "Lỗi" },
+    info    = { Color = Color3.fromRGB(0, 212, 255),  Icon = "ℹ", TitleKey = "n_info" },
+    success = { Color = Color3.fromRGB(80, 220, 120), Icon = "✔", TitleKey = "n_success" },
+    warning = { Color = Color3.fromRGB(255, 190, 60), Icon = "⚠", TitleKey = "n_warning" },
+    error   = { Color = Color3.fromRGB(255, 85, 85),  Icon = "✖", TitleKey = "n_error" },
 }
 
 local DEFAULT_SOUNDS = {
@@ -79,6 +79,120 @@ local function SafeCall(cb, ...)
     if type(cb) ~= "function" then return end
     local ok, err = pcall(cb, ...)
     if not ok then warn("[CyberVibe] " .. tostring(err)) end
+end
+
+-- ===================== CÀI ĐẶT (LƯU FILE) + NGÔN NGỮ =====================
+local SETTINGS_FILE = "CyberVibe_Settings.json"
+local Settings      = { Language = "en", Intro = true }   -- mặc định: tiếng Anh, bật intro
+local introPlayed   = false
+
+local function SaveSettings()
+    if type(writefile) ~= "function" then return end
+    pcall(function()
+        writefile(SETTINGS_FILE, HttpService:JSONEncode(Settings))
+    end)
+end
+
+local function LoadSettings()
+    if type(readfile) ~= "function" then return end
+    pcall(function()
+        if type(isfile) == "function" and not isfile(SETTINGS_FILE) then return end
+        local data = HttpService:JSONDecode(readfile(SETTINGS_FILE))
+        if type(data) ~= "table" then return end
+        if data.Language == "en" or data.Language == "vi" then Settings.Language = data.Language end
+        if type(data.Intro) == "boolean" then Settings.Intro = data.Intro end
+    end)
+end
+LoadSettings()
+
+local STRINGS = {
+    en = {
+        n_info = "Notice", n_success = "Success", n_warning = "Warning", n_error = "Error",
+        sec_lang = "LANGUAGE", sec_startup = "STARTUP", intro_anim = "Intro animation",
+        sec_border = "MENU BORDER", rainbow = "Rainbow",
+        sec_bg = "MENU BACKGROUND", tile_icon = "Mini menu", tile_plain = "Plain",
+        id_ph = "Image ID + Enter", bg_title = "Background", bg_invalid = "Invalid image ID",
+        sec_info = "INFO",
+        f_userid = "User ID", f_age = "Account age", f_plan = "Plan", f_team = "Team",
+        f_hp = "Health", f_speed = "Walk speed", f_jump = "Jump power", f_pos = "Position",
+        f_ping = "Ping", f_fps = "FPS",
+        days = "%d days", premium = "Premium", standard = "Standard", no_team = "None",
+        players_hdr = "👥 Players", players_cnt = "👥 %d players",
+        friend_all = "Add all friends", back = "< Back",
+        f_username = "Username", f_friends = "Friends",
+        add_friend = "Add friend", is_friend = "Already friends", req_sent = "Request sent",
+        loading = "Loading...", unavailable = "Unavailable",
+        friend_title = "Friends", friend_all_title = "Add all friends",
+        friend_sent_to = "Request sent to %s", friend_fail = "Couldn't send request",
+        friend_none = "No other players", sending = "Sending %d/%d",
+        mass_unsupported = "Executor doesn't support bulk friend requests",
+        mass_result = "Sent %d • Skipped %d • Failed %d",
+        confirm_title = "⚠️ Confirm Delete",
+        confirm_body = "Are you sure you want to\nCOMPLETELY DELETE this menu?",
+        confirm_yes = "Confirm Delete", confirm_no = "Cancel",
+        err_nowrite = "Executor doesn't support writefile", err_encode = "Couldn't encode config",
+        err_noread = "Executor doesn't support readfile", err_nofile = "Config file not found",
+        err_badfile = "Config file is corrupted",
+    },
+    vi = {
+        n_info = "Thông Báo", n_success = "Thành Công", n_warning = "Cảnh Báo", n_error = "Lỗi",
+        sec_lang = "NGÔN NGỮ", sec_startup = "KHỞI ĐỘNG", intro_anim = "Hoạt ảnh mở đầu",
+        sec_border = "VIỀN MENU", rainbow = "Cầu vồng",
+        sec_bg = "NỀN MENU", tile_icon = "Menu nhỏ", tile_plain = "Trơn",
+        id_ph = "ID ảnh + Enter", bg_title = "Hình nền", bg_invalid = "ID ảnh không hợp lệ",
+        sec_info = "THÔNG TIN",
+        f_userid = "User ID", f_age = "Tuổi tài khoản", f_plan = "Gói", f_team = "Đội",
+        f_hp = "Máu", f_speed = "Tốc độ chạy", f_jump = "Sức nhảy", f_pos = "Vị trí",
+        f_ping = "Ping", f_fps = "FPS",
+        days = "%d ngày", premium = "Premium", standard = "Thường", no_team = "Không có",
+        players_hdr = "👥 Người chơi", players_cnt = "👥 %d người chơi",
+        friend_all = "Kết bạn tất cả", back = "< Quay lại",
+        f_username = "Tên người dùng", f_friends = "Số bạn bè",
+        add_friend = "Kết bạn", is_friend = "Đã là bạn bè", req_sent = "Đã gửi lời mời",
+        loading = "Đang tải...", unavailable = "Không lấy được",
+        friend_title = "Kết bạn", friend_all_title = "Kết bạn tất cả",
+        friend_sent_to = "Đã gửi lời mời tới %s", friend_fail = "Không gửi được lời mời",
+        friend_none = "Không có người chơi nào khác", sending = "Đang gửi %d/%d",
+        mass_unsupported = "Executor không hỗ trợ gửi lời mời hàng loạt",
+        mass_result = "Đã gửi %d • Bỏ qua %d • Lỗi %d",
+        confirm_title = "⚠️ Xác Nhận Xóa",
+        confirm_body = "Bạn có chắc chắn muốn\nXÓA HOÀN TOÀN menu này không?",
+        confirm_yes = "Xác Nhận Xóa", confirm_no = "Hủy Bỏ",
+        err_nowrite = "Executor không hỗ trợ writefile", err_encode = "Không thể mã hóa cấu hình",
+        err_noread = "Executor không hỗ trợ readfile", err_nofile = "Không tìm thấy file cấu hình",
+        err_badfile = "File cấu hình bị lỗi",
+    },
+}
+
+local function L(key, ...)
+    local pack = STRINGS[Settings.Language] or STRINGS.en
+    local str = pack[key] or STRINGS.en[key] or key
+    if select("#", ...) > 0 then
+        local ok, out = pcall(string.format, str, ...)
+        if ok then return out end
+    end
+    return str
+end
+
+-- Mỗi hook gắn với 1 instance; instance bị Destroy (Parent = nil) thì hook tự bị gỡ.
+local langHooks = {}
+local function OnLang(owner, fn)
+    SafeCall(fn)
+    table.insert(langHooks, { owner = owner, fn = fn })
+end
+
+local function SetLanguage(code)
+    if code ~= "en" and code ~= "vi" then return end
+    Settings.Language = code
+    SaveSettings()
+    for i = #langHooks, 1, -1 do
+        local h = langHooks[i]
+        if not h.owner or not h.owner.Parent then
+            table.remove(langHooks, i)
+        else
+            SafeCall(h.fn)
+        end
+    end
 end
 
 local function GetGuiRoot()
@@ -205,6 +319,196 @@ local function EnsureNotifyGui()
     return NotifyGui
 end
 
+-- ===================== INTRO: 2 CHỮ C GHÉP THÀNH CON MẮT =====================
+-- Chỉnh nhanh: EYE_GAP = khoảng cách 2 chữ C so với tâm, EYE_Y = độ cao con mắt
+local function PlayIntro()
+    local EYE_GAP, EYE_Y, LOGO_Y = 50, 56, 60
+    local skipped = false
+    local vp = GetViewport()
+    local scale = math.clamp(math.min(vp.X, vp.Y) / 430, 0.6, 1.25)
+
+    local gui = New("ScreenGui", {
+        Name = "CyberVibe_Intro_" .. math.random(1000, 9999),
+        ResetOnSpawn = false,
+        IgnoreGuiInset = true,
+        DisplayOrder = 1000,
+        ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    })
+    ParentGui(gui)
+
+    local function Run()
+        local PURPLE = Color3.fromRGB(150, 90, 255)
+
+        -- Nền mờ; bấm vào đâu cũng bỏ qua intro
+        local Dim = New("TextButton", {
+            Size = UDim2.new(1, 0, 1, 0),
+            BackgroundColor3 = Color3.fromRGB(8, 9, 13),
+            BackgroundTransparency = 1,
+            Text = "",
+            AutoButtonColor = false,
+            ZIndex = 1
+        }, gui)
+        Dim.MouseButton1Click:Connect(function() skipped = true end)
+
+        local Root = New("Frame", {
+            AnchorPoint = Vector2.new(0.5, 0.5),
+            Position = UDim2.new(0.5, 0, 0.5, 0),
+            Size = UDim2.new(0, 320, 0, 220),
+            BackgroundTransparency = 1,
+            Active = false,
+            ZIndex = 2
+        }, gui)
+        local RootScale = New("UIScale", { Scale = scale * 0.92 }, Root)
+
+        local function MakeC(startX, rot)
+            local lbl = New("TextLabel", {
+                AnchorPoint = Vector2.new(0.5, 0.5),
+                Position = UDim2.new(0.5, startX, 0, LOGO_Y),
+                Size = UDim2.new(0, 100, 0, 120),
+                BackgroundTransparency = 1,
+                Font = Enum.Font.GothamBlack,
+                Text = "C",
+                TextSize = 100,
+                TextColor3 = WHITE,
+                TextTransparency = 1,
+                Rotation = rot,
+                ZIndex = 3
+            }, Root)
+            local grad = New("UIGradient", {
+                Color = ColorSequence.new(ACCENT, PURPLE),
+                Rotation = 45
+            }, lbl)
+            local st = New("UIStroke", {
+                Color = ACCENT,
+                Thickness = 2,
+                Transparency = 1,
+                ApplyStrokeMode = Enum.ApplyStrokeMode.Contextual
+            }, lbl)
+            return lbl, grad, st
+        end
+
+        local CL, GradL, StL = MakeC(-EYE_GAP - 110, 0)
+        local CR, GradR, StR = MakeC(EYE_GAP + 110, 180)
+
+        -- Con mắt: tròng + đồng tử
+        local Iris = New("Frame", {
+            AnchorPoint = Vector2.new(0.5, 0.5),
+            Position = UDim2.new(0.5, 0, 0, EYE_Y),
+            Size = UDim2.new(0, 0, 0, 0),
+            BackgroundColor3 = BG_CONTROL,
+            ClipsDescendants = true,
+            ZIndex = 4
+        }, Root)
+        Corner(Iris, UDim.new(1, 0))
+        local IrisStroke = Stroke(Iris, ACCENT, 2)
+
+        local Pupil = New("Frame", {
+            AnchorPoint = Vector2.new(0.5, 0.5),
+            Position = UDim2.new(0.5, 0, 0.5, 0),
+            Size = UDim2.new(0, 14, 0, 14),
+            BackgroundColor3 = WHITE,
+            ZIndex = 5
+        }, Iris)
+        Corner(Pupil, UDim.new(1, 0))
+        New("Frame", { -- điểm sáng nhỏ trong đồng tử
+            Position = UDim2.new(0, 3, 0, 3),
+            Size = UDim2.new(0, 4, 0, 4),
+            BackgroundColor3 = ACCENT,
+            ZIndex = 6
+        }, Pupil)
+        Corner(Pupil:FindFirstChildOfClass("Frame"), UDim.new(1, 0))
+
+        local Title = New("TextLabel", {
+            AnchorPoint = Vector2.new(0.5, 0),
+            Position = UDim2.new(0.5, 0, 0, 142),
+            Size = UDim2.new(0, 300, 0, 26),
+            BackgroundTransparency = 1,
+            Font = Enum.Font.GothamBold,
+            Text = "C Y B E R V I B E",
+            TextSize = 16,
+            TextColor3 = TEXT_MAIN,
+            TextTransparency = 1,
+            ZIndex = 3
+        }, Root)
+
+        local BarTrack = New("Frame", {
+            AnchorPoint = Vector2.new(0.5, 0),
+            Position = UDim2.new(0.5, 0, 0, 182),
+            Size = UDim2.new(0, 140, 0, 3),
+            BackgroundColor3 = BG_OFF,
+            BackgroundTransparency = 1,
+            ZIndex = 3
+        }, Root)
+        Corner(BarTrack, UDim.new(1, 0))
+        local BarFill = New("Frame", {
+            Size = UDim2.new(0, 0, 1, 0),
+            BackgroundColor3 = ACCENT,
+            ZIndex = 4
+        }, BarTrack)
+        Corner(BarFill, UDim.new(1, 0))
+
+        local function W(t)
+            local e = 0
+            while e < t and not skipped do
+                e = e + task.wait(0.03)
+            end
+        end
+
+        local quint = TweenInfo.new(0.8, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+        local look  = TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.InOut)
+        local mid   = UDim2.new(0.5, 0, 0.5, 0)
+
+        -- 1) Nền mờ + 2 chữ C trượt vào từ hai bên
+        Tween(Dim, TweenInfo.new(0.35), { BackgroundTransparency = 0.35 })
+        Tween(RootScale, TweenInfo.new(1.1, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), { Scale = scale })
+        W(0.1)
+        Tween(CL, quint, { Position = UDim2.new(0.5, -EYE_GAP, 0, LOGO_Y), TextTransparency = 0 })
+        Tween(CR, quint, { Position = UDim2.new(0.5, EYE_GAP, 0, LOGO_Y), TextTransparency = 0 })
+        Tween(StL, quint, { Transparency = 0.55 })
+        Tween(StR, quint, { Transparency = 0.55 })
+        Tween(GradL, TweenInfo.new(3, Enum.EasingStyle.Linear), { Rotation = 225 })
+        Tween(GradR, TweenInfo.new(3, Enum.EasingStyle.Linear), { Rotation = 225 })
+        Tween(BarTrack, TweenInfo.new(0.4), { BackgroundTransparency = 0 })
+        Tween(BarFill, TweenInfo.new(2.6, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), { Size = UDim2.new(1, 0, 1, 0) })
+        W(0.75)
+
+        -- 2) Con mắt mở ra giữa 2 chữ C + tiêu đề hiện lên
+        Tween(Iris, TweenInfo.new(0.45, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Size = UDim2.new(0, 30, 0, 30) })
+        Tween(Title, TweenInfo.new(0.6, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { TextTransparency = 0 })
+        W(0.45)
+
+        -- 3) Mắt nhìn trái -> phải -> giữa
+        Tween(Pupil, look, { Position = UDim2.new(0.5, -6, 0.5, 0) }); W(0.4)
+        Tween(Pupil, look, { Position = UDim2.new(0.5, 6, 0.5, 0) });  W(0.45)
+        Tween(Pupil, look, { Position = mid });                        W(0.25)
+
+        -- 4) Chớp mắt
+        Tween(Iris, TweenInfo.new(0.09, Enum.EasingStyle.Quad, Enum.EasingDirection.In), { Size = UDim2.new(0, 30, 0, 3) })
+        W(0.1)
+        Tween(Iris, TweenInfo.new(0.14, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { Size = UDim2.new(0, 30, 0, 30) })
+        W(0.45)
+
+        -- 5) Mờ dần rồi biến mất
+        local out = TweenInfo.new(0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+        Tween(Dim, out, { BackgroundTransparency = 1 })
+        Tween(CL, out, { TextTransparency = 1 })
+        Tween(CR, out, { TextTransparency = 1 })
+        Tween(StL, out, { Transparency = 1 })
+        Tween(StR, out, { Transparency = 1 })
+        Tween(Title, out, { TextTransparency = 1 })
+        Tween(Iris, out, { BackgroundTransparency = 1 })
+        Tween(IrisStroke, out, { Transparency = 1 })
+        Tween(Pupil, out, { BackgroundTransparency = 1 })
+        Tween(BarTrack, out, { BackgroundTransparency = 1 })
+        Tween(BarFill, out, { BackgroundTransparency = 1 })
+        Tween(RootScale, out, { Scale = scale * 1.08 })
+        task.wait(0.42)
+    end
+
+    pcall(Run)
+    if gui.Parent then gui:Destroy() end
+end
+
 function Library:Notify(config)
     if type(config) ~= "table" then
         config = { Content = tostring(config or "") }
@@ -213,7 +517,7 @@ function Library:Notify(config)
     local typeKey  = config.Type or config.type
     local typeInfo = typeKey and NOTIFY_TYPES[string.lower(tostring(typeKey))] or nil
 
-    local Title    = config.Title or config.title or (typeInfo and typeInfo.Title) or "Thông Báo"
+    local Title    = config.Title or config.title or (typeInfo and L(typeInfo.TitleKey)) or L("n_info")
     local Content  = config.Content or config.content or config.Message or config.message or ""
     local Duration = config.Duration or config.duration or 4
     local Accent   = config.Color or config.color or (typeInfo and typeInfo.Color) or ACCENT
@@ -424,6 +728,9 @@ local function MakeShortcut(typeName)
         })
     end
 end
+
+function Library:SetLanguage(code) SetLanguage(code) end
+function Library:GetLanguage() return Settings.Language end
 
 Library.Info    = MakeShortcut("info")
 Library.Success = MakeShortcut("success")
@@ -895,22 +1202,132 @@ function Library:CreateWindow(config)
             return order
         end
 
-        local function Section(text)
-            New("TextLabel", {
+        local function Section(key)
+            local lbl = New("TextLabel", {
                 Size = UDim2.new(1, -4, 0, 16),
                 BackgroundTransparency = 1,
                 Font = Enum.Font.GothamBold,
                 TextSize = 9,
                 TextXAlignment = Enum.TextXAlignment.Left,
                 TextColor3 = TEXT_DIM,
-                Text = text,
+                Text = L(key),
                 LayoutOrder = NextOrder(),
                 ZIndex = 4
             }, Scroll)
+            OnLang(lbl, function() lbl.Text = L(key) end)
+        end
+
+        -- ============ NGÔN NGỮ ============
+        Section("sec_lang")
+        do
+            local LangRow = New("Frame", {
+                Size = UDim2.new(1, -4, 0, 26),
+                BackgroundTransparency = 1,
+                LayoutOrder = NextOrder(),
+                ZIndex = 4
+            }, Scroll)
+
+            local langBtns = {}
+            local function MarkLang()
+                for code, b in pairs(langBtns) do
+                    local on = (Settings.Language == code)
+                    b.stroke.Color = on and ACCENT or STROKE_COL
+                    b.stroke.Thickness = on and 1.5 or 1
+                    b.btn.TextColor3 = on and ACCENT or TEXT_MAIN
+                end
+            end
+
+            local defs = {
+                { code = "en", text = "English",    x = 0,   pad = 0 },
+                { code = "vi", text = "Tiếng Việt", x = 0.5, pad = 2 },
+            }
+            for _, d in ipairs(defs) do
+                local btn = New("TextButton", {
+                    Size = UDim2.new(0.5, -2, 1, 0),
+                    Position = UDim2.new(d.x, d.pad, 0, 0),
+                    BackgroundColor3 = BG_CONTROL,
+                    Font = Enum.Font.GothamMedium,
+                    TextSize = 10,
+                    TextScaled = true,
+                    TextColor3 = TEXT_MAIN,
+                    Text = d.text,
+                    AutoButtonColor = false,
+                    ZIndex = 5
+                }, LangRow)
+                Corner(btn, UDim.new(0, 6))
+                New("UITextSizeConstraint", { MaxTextSize = 10, MinTextSize = 7 }, btn)
+                New("UIPadding", { PaddingLeft = UDim.new(0, 3), PaddingRight = UDim.new(0, 3) }, btn)
+                langBtns[d.code] = { btn = btn, stroke = Stroke(btn, STROKE_COL, 1) }
+                btn.MouseButton1Click:Connect(function() SetLanguage(d.code) end)
+            end
+            OnLang(LangRow, MarkLang)
+        end
+
+        -- ============ KHỞI ĐỘNG: bật/tắt intro (lưu lại) ============
+        Section("sec_startup")
+        do
+            local IntroRow = New("TextButton", {
+                Size = UDim2.new(1, -4, 0, 28),
+                BackgroundColor3 = BG_CONTROL,
+                Text = "",
+                AutoButtonColor = false,
+                LayoutOrder = NextOrder(),
+                ZIndex = 4
+            }, Scroll)
+            Corner(IntroRow, UDim.new(0, 6))
+
+            local IntroLbl = New("TextLabel", {
+                Size = UDim2.new(1, -40, 1, 0),
+                Position = UDim2.new(0, 6, 0, 0),
+                BackgroundTransparency = 1,
+                Font = Enum.Font.GothamMedium,
+                TextSize = 10,
+                TextScaled = true,
+                TextXAlignment = Enum.TextXAlignment.Left,
+                TextColor3 = TEXT_MAIN,
+                ZIndex = 5
+            }, IntroRow)
+            New("UITextSizeConstraint", { MaxTextSize = 10, MinTextSize = 7 }, IntroLbl)
+            OnLang(IntroLbl, function() IntroLbl.Text = L("intro_anim") end)
+
+            local IntroTrack = New("Frame", {
+                Size = UDim2.new(0, 26, 0, 14),
+                Position = UDim2.new(1, -32, 0.5, -7),
+                BackgroundColor3 = BG_OFF,
+                ZIndex = 5
+            }, IntroRow)
+            Corner(IntroTrack, UDim.new(1, 0))
+            local IntroKnob = New("Frame", {
+                Size = UDim2.new(0, 10, 0, 10),
+                Position = UDim2.new(0, 2, 0.5, -5),
+                BackgroundColor3 = WHITE,
+                ZIndex = 6
+            }, IntroTrack)
+            Corner(IntroKnob, UDim.new(1, 0))
+
+            local function PaintIntro(animate)
+                local on = Settings.Intro
+                local col = on and ACCENT or BG_OFF
+                local pos = on and UDim2.new(1, -12, 0.5, -5) or UDim2.new(0, 2, 0.5, -5)
+                if animate then
+                    Tween(IntroTrack, fastInfo, { BackgroundColor3 = col })
+                    Tween(IntroKnob, fastInfo, { Position = pos })
+                else
+                    IntroTrack.BackgroundColor3 = col
+                    IntroKnob.Position = pos
+                end
+            end
+            PaintIntro(false)
+
+            IntroRow.MouseButton1Click:Connect(function()
+                Settings.Intro = not Settings.Intro
+                SaveSettings()
+                PaintIntro(true)
+            end)
         end
 
         -- ============ GIAO DIỆN: viền ============
-        Section("VIỀN MENU")
+        Section("sec_border")
 
         local RainbowRow = New("TextButton", {
             Size = UDim2.new(1, -4, 0, 28),
@@ -921,7 +1338,7 @@ function Library:CreateWindow(config)
             ZIndex = 4
         }, Scroll)
         Corner(RainbowRow, UDim.new(0, 6))
-        New("TextLabel", {
+        local RainbowLbl = New("TextLabel", {
             Size = UDim2.new(1, -40, 1, 0),
             Position = UDim2.new(0, 6, 0, 0),
             BackgroundTransparency = 1,
@@ -930,9 +1347,10 @@ function Library:CreateWindow(config)
             TextXAlignment = Enum.TextXAlignment.Left,
             TextTruncate = Enum.TextTruncate.AtEnd,
             TextColor3 = TEXT_MAIN,
-            Text = "Cầu vồng",
+            Text = L("rainbow"),
             ZIndex = 5
         }, RainbowRow)
+        OnLang(RainbowLbl, function() RainbowLbl.Text = L("rainbow") end)
         local SwTrack = New("Frame", {
             Size = UDim2.new(0, 26, 0, 14),
             Position = UDim2.new(1, -32, 0.5, -7),
@@ -1010,7 +1428,7 @@ function Library:CreateWindow(config)
         end)
 
         -- ============ GIAO DIỆN: nền menu ============
-        Section("NỀN MENU")
+        Section("sec_bg")
 
         local bgMode      = "icon"   -- icon | none | custom
         local customImage = ""
@@ -1041,10 +1459,11 @@ function Library:CreateWindow(config)
             Font = Enum.Font.GothamBold,
             TextSize = 9,
             TextColor3 = WHITE,
-            Text = "Menu nhỏ",
+            Text = L("tile_icon"),
             ZIndex = 6
         }, TileIcon)
         Corner(TileCap, UDim.new(0, 6))
+        OnLang(TileCap, function() TileCap.Text = L("tile_icon") end)
 
         -- Ô 2: nền trơn
         local TileNone = New("TextButton", {
@@ -1054,12 +1473,13 @@ function Library:CreateWindow(config)
             Font = Enum.Font.GothamMedium,
             TextSize = 10,
             TextColor3 = TEXT_MAIN,
-            Text = "Trơn",
+            Text = L("tile_plain"),
             AutoButtonColor = false,
             ZIndex = 5
         }, Tiles)
         Corner(TileNone, UDim.new(0, 6))
         local TileNoneStroke = Stroke(TileNone, STROKE_COL, 1)
+        OnLang(TileNone, function() TileNone.Text = L("tile_plain") end)
 
         local function RefreshTiles()
             TileIconStroke.Color = (bgMode == "icon") and ACCENT or STROKE_COL
@@ -1140,7 +1560,7 @@ function Library:CreateWindow(config)
             Font = Enum.Font.Gotham,
             TextSize = 10,
             TextColor3 = TEXT_MAIN,
-            PlaceholderText = "ID ảnh + Enter",
+            PlaceholderText = L("id_ph"),
             PlaceholderColor3 = TEXT_DIM,
             Text = "",
             ClearTextOnFocus = false,
@@ -1150,13 +1570,14 @@ function Library:CreateWindow(config)
         }, Scroll)
         Corner(IdBox, UDim.new(0, 6))
         New("UIPadding", { PaddingLeft = UDim.new(0, 6), PaddingRight = UDim.new(0, 6) }, IdBox)
+        OnLang(IdBox, function() IdBox.PlaceholderText = L("id_ph") end)
 
         IdBox.FocusLost:Connect(function()
             local t = (IdBox.Text:gsub("%s+", ""))
             if t == "" then return end
             if t:match("^%d+$") then t = "rbxassetid://" .. t end
             if not t:match("^rbxassetid://%d+$") then
-                Library:Notify({ Type = "warning", Title = "Hình nền", Content = "ID ảnh không hợp lệ", Duration = 3, Silent = true })
+                Library:Notify({ Type = "warning", Title = L("bg_title"), Content = L("bg_invalid"), Duration = 3, Silent = true })
                 return
             end
             customImage = t
@@ -1167,7 +1588,7 @@ function Library:CreateWindow(config)
         ApplyBg() -- mặc định: dùng ảnh của menu nhỏ làm nền menu lớn
 
         -- ============ THÔNG TIN NGƯỜI CHƠI ============
-        Section("THÔNG TIN")
+        Section("sec_info")
 
         local function Row(label)
             local f = New("Frame", {
@@ -1177,7 +1598,7 @@ function Library:CreateWindow(config)
                 ZIndex = 4
             }, Scroll)
             Corner(f, UDim.new(0, 6))
-            New("TextLabel", {
+            local cap = New("TextLabel", {
                 Size = UDim2.new(1, -10, 0, 12),
                 Position = UDim2.new(0, 6, 0, 3),
                 BackgroundTransparency = 1,
@@ -1185,9 +1606,10 @@ function Library:CreateWindow(config)
                 TextSize = 10,
                 TextXAlignment = Enum.TextXAlignment.Left,
                 TextColor3 = TEXT_DIM,
-                Text = label,
+                Text = L(label),
                 ZIndex = 5
             }, f)
+            OnLang(cap, function() cap.Text = L(label) end)
             return New("TextLabel", {
                 Size = UDim2.new(1, -10, 0, 14),
                 Position = UDim2.new(0, 6, 0, 15),
@@ -1202,21 +1624,23 @@ function Library:CreateWindow(config)
             }, f)
         end
 
-        local vId    = Row("User ID")
-        local vAge   = Row("Tuổi tài khoản")
-        local vMem   = Row("Gói")
-        local vTeam  = Row("Đội")
-        local vHp    = Row("Máu")
-        local vSpeed = Row("Tốc độ chạy")
-        local vJump  = Row("Sức nhảy")
-        local vPos   = Row("Vị trí")
-        local vPing  = Row("Ping")
-        local vFps   = Row("FPS")
+        local vId    = Row("f_userid")
+        local vAge   = Row("f_age")
+        local vMem   = Row("f_plan")
+        local vTeam  = Row("f_team")
+        local vHp    = Row("f_hp")
+        local vSpeed = Row("f_speed")
+        local vJump  = Row("f_jump")
+        local vPos   = Row("f_pos")
+        local vPing  = Row("f_ping")
+        local vFps   = Row("f_fps")
 
         -- Thông tin tĩnh: chỉ đặt 1 lần
         vId.Text  = tostring(lp.UserId)
-        vAge.Text = lp.AccountAge .. " ngày"
-        vMem.Text = (lp.MembershipType == Enum.MembershipType.Premium) and "Premium" or "Thường"
+        OnLang(vAge, function()
+            vAge.Text = L("days", lp.AccountAge)
+            vMem.Text = (lp.MembershipType == Enum.MembershipType.Premium) and L("premium") or L("standard")
+        end)
 
         task.spawn(function()
             local ok, img = pcall(function()
@@ -1230,7 +1654,7 @@ function Library:CreateWindow(config)
             local hum  = char and char:FindFirstChildOfClass("Humanoid")
             local root = char and char:FindFirstChild("HumanoidRootPart")
 
-            vTeam.Text = lp.Team and lp.Team.Name or "Không có"
+            vTeam.Text = lp.Team and lp.Team.Name or L("no_team")
 
             if hum then
                 vHp.Text    = string.format("%d / %d", math.floor(hum.Health + 0.5), math.floor(hum.MaxHealth + 0.5))
@@ -1254,6 +1678,8 @@ function Library:CreateWindow(config)
             local okPing, ping = pcall(function() return lp:GetNetworkPing() end)
             vPing.Text = okPing and (math.floor(ping * 1000) .. " ms") or "-"
         end
+
+        OnLang(vTeam, Refresh) -- đổi ngôn ngữ thì làm mới chữ ("Không có"...)
 
         -- Mũi tên: khi thu nằm sát menu, khi mở dịch ra ngoài cùng bên phải panel
         local Arrow = New("TextButton", {
@@ -1374,13 +1800,13 @@ function Library:CreateWindow(config)
             TextScaled = true,
             TextColor3 = ACCENT,
             TextXAlignment = Enum.TextXAlignment.Left,
-            Text = "👥 Người chơi",
+            Text = L("players_hdr"),
             ZIndex = 3
         }, Panel)
         New("UITextSizeConstraint", { MaxTextSize = 11, MinTextSize = 8 }, TitleLbl)
 
         local function UpdateCount()
-            TitleLbl.Text = "👥 " .. #Players:GetPlayers() .. " người chơi"
+            TitleLbl.Text = L("players_cnt", #Players:GetPlayers())
         end
 
         -- Nút kết bạn tất cả (đặt phía trên tab con)
@@ -1388,7 +1814,7 @@ function Library:CreateWindow(config)
             Size = UDim2.new(1, -16, 0, 26),
             Position = UDim2.new(0, 8, 0, 28),
             BackgroundColor3 = ACCENT_DARK,
-            Text = "Kết bạn tất cả",
+            Text = L("friend_all"),
             TextColor3 = WHITE,
             Font = Enum.Font.GothamBold,
             TextSize = 11,
@@ -1447,7 +1873,7 @@ function Library:CreateWindow(config)
         local BackBtn = New("TextButton", {
             Size = UDim2.new(1, -4, 0, 22),
             BackgroundColor3 = BG_CONTROL,
-            Text = "< Quay lại",
+            Text = L("back"),
             TextColor3 = ACCENT,
             Font = Enum.Font.GothamBold,
             TextSize = 10,
@@ -1456,6 +1882,7 @@ function Library:CreateWindow(config)
             ZIndex = 4
         }, DetailView)
         Corner(BackBtn, UDim.new(0, 6))
+        OnLang(BackBtn, function() BackBtn.Text = L("back") end)
 
         local DAvatar = New("ImageLabel", {
             Size = UDim2.new(0, 60, 0, 60),
@@ -1489,7 +1916,7 @@ function Library:CreateWindow(config)
                 ZIndex = 4
             }, DetailView)
             Corner(f, UDim.new(0, 6))
-            New("TextLabel", {
+            local cap = New("TextLabel", {
                 Size = UDim2.new(1, -10, 0, 12),
                 Position = UDim2.new(0, 6, 0, 3),
                 BackgroundTransparency = 1,
@@ -1498,9 +1925,10 @@ function Library:CreateWindow(config)
                 TextXAlignment = Enum.TextXAlignment.Left,
                 TextTruncate = Enum.TextTruncate.AtEnd,
                 TextColor3 = TEXT_DIM,
-                Text = label,
+                Text = L(label),
                 ZIndex = 5
             }, f)
+            OnLang(cap, function() cap.Text = L(label) end)
             return New("TextLabel", {
                 Size = UDim2.new(1, -10, 0, 14),
                 Position = UDim2.new(0, 6, 0, 15),
@@ -1515,15 +1943,15 @@ function Library:CreateWindow(config)
             }, f)
         end
 
-        local vUser    = Row("Tên người dùng")
-        local vId      = Row("User ID")
-        local vAge     = Row("Tuổi tài khoản")
-        local vFriends = Row("Số bạn bè")
+        local vUser    = Row("f_username")
+        local vId      = Row("f_userid")
+        local vAge     = Row("f_age")
+        local vFriends = Row("f_friends")
 
         local FriendBtn = New("TextButton", {
             Size = UDim2.new(1, -4, 0, 28),
             BackgroundColor3 = ACCENT_DARK,
-            Text = "Kết bạn",
+            Text = L("add_friend"),
             TextColor3 = WHITE,
             Font = Enum.Font.GothamBold,
             TextSize = 11,
@@ -1573,26 +2001,43 @@ function Library:CreateWindow(config)
             end)
         end
 
+        local friendState = "add"
         local function SetFriendBtn(state)
+            friendState = state
             if state == "self" then
                 FriendBtn.Visible = false
                 return
             end
             FriendBtn.Visible = true
             if state == "add" then
-                FriendBtn.Text = "Kết bạn"
+                FriendBtn.Text = L("add_friend")
                 FriendBtn.BackgroundColor3 = ACCENT_DARK
                 FriendBtn.TextColor3 = WHITE
             elseif state == "friend" then
-                FriendBtn.Text = "Đã là bạn bè"
+                FriendBtn.Text = L("is_friend")
                 FriendBtn.BackgroundColor3 = BG_OFF
                 FriendBtn.TextColor3 = TEXT_DIM
             else
-                FriendBtn.Text = "Đã gửi lời mời"
+                FriendBtn.Text = L("req_sent")
                 FriendBtn.BackgroundColor3 = BG_OFF
                 FriendBtn.TextColor3 = TEXT_DIM
             end
         end
+        OnLang(FriendBtn, function()
+            if friendState ~= "self" then SetFriendBtn(friendState) end
+        end)
+
+        local friendsVal = nil -- nil | "loading" | "fail" | number
+        local function RenderFriends()
+            if friendsVal == "loading" then vFriends.Text = L("loading")
+            elseif friendsVal == "fail" then vFriends.Text = L("unavailable")
+            elseif friendsVal == nil then vFriends.Text = "-"
+            else vFriends.Text = tostring(friendsVal) end
+        end
+        OnLang(vFriends, RenderFriends)
+        OnLang(vAge, function()
+            if selected then vAge.Text = L("days", selected.AccountAge) end
+        end)
 
         local cells = {}
         local function Highlight()
@@ -1616,8 +2061,9 @@ function Library:CreateWindow(config)
             DName.Text = plr.DisplayName
             vUser.Text = "@" .. plr.Name
             vId.Text = tostring(plr.UserId)
-            vAge.Text = plr.AccountAge .. " ngày"
-            vFriends.Text = "Đang tải..."
+            vAge.Text = L("days", plr.AccountAge)
+            friendsVal = "loading"
+            RenderFriends()
 
             GridView.Visible = false
             DetailView.Visible = true
@@ -1635,7 +2081,8 @@ function Library:CreateWindow(config)
 
             FetchFriendCount(plr.UserId, function(n)
                 if selected == plr then
-                    vFriends.Text = n and tostring(n) or "Không lấy được"
+                    friendsVal = n or "fail"
+                    RenderFriends()
                 end
             end)
         end
@@ -1645,13 +2092,13 @@ function Library:CreateWindow(config)
         FriendBtn.MouseButton1Click:Connect(function()
             local plr = selected
             if not plr or plr == lp or sentTo[plr.UserId] then return end
-            if FriendBtn.Text ~= "Kết bạn" then return end
+            if friendState ~= "add" then return end
             if SendFriend(plr, true) then
                 sentTo[plr.UserId] = true
                 if selected == plr then SetFriendBtn("sent") end
-                Library:Notify({ Type = "success", Title = "Kết bạn", Content = "Đã gửi lời mời tới " .. plr.DisplayName, Duration = 3, Silent = true })
+                Library:Notify({ Type = "success", Title = L("friend_title"), Content = L("friend_sent_to", plr.DisplayName), Duration = 3, Silent = true })
             else
-                Library:Notify({ Type = "error", Title = "Kết bạn", Content = "Không gửi được lời mời", Duration = 3, Silent = true })
+                Library:Notify({ Type = "error", Title = L("friend_title"), Content = L("friend_fail"), Duration = 3, Silent = true })
             end
         end)
 
@@ -1703,7 +2150,12 @@ function Library:CreateWindow(config)
         Track(Players.PlayerRemoving:Connect(function(plr)
             task.defer(RemovePlayer, plr)
         end))
-        UpdateCount()
+        OnLang(TitleLbl, UpdateCount)
+
+        local sendI, sendN = 0, 0
+        OnLang(AllBtn, function()
+            AllBtn.Text = (sending and sendN > 0) and L("sending", sendI, sendN) or L("friend_all")
+        end)
 
         -- ============ Kết bạn tất cả ============
         AllBtn.MouseButton1Click:Connect(function()
@@ -1713,7 +2165,7 @@ function Library:CreateWindow(config)
                 if plr ~= lp then table.insert(targets, plr) end
             end
             if #targets == 0 then
-                Library:Notify({ Type = "warning", Title = "Kết bạn", Content = "Không có người chơi nào khác", Duration = 3, Silent = true })
+                Library:Notify({ Type = "warning", Title = L("friend_title"), Content = L("friend_none"), Duration = 3, Silent = true })
                 return
             end
 
@@ -1722,7 +2174,8 @@ function Library:CreateWindow(config)
                 local sent, skipped, failed = 0, 0, 0
                 for i, plr in ipairs(targets) do
                     if destroyed then break end
-                    AllBtn.Text = string.format("Đang gửi %d/%d", i, #targets)
+                    sendI, sendN = i, #targets
+                    AllBtn.Text = L("sending", i, #targets)
                     if plr.Parent and not IsFriend(plr) and not sentTo[plr.UserId] then
                         if SendFriend(plr, false) then
                             sentTo[plr.UserId] = true
@@ -1736,16 +2189,17 @@ function Library:CreateWindow(config)
                     end
                 end
                 sending = false
-                AllBtn.Text = "Kết bạn tất cả"
+                sendN = 0
+                AllBtn.Text = L("friend_all")
                 if selected and selected ~= lp then
                     SetFriendBtn(sentTo[selected.UserId] and "sent" or (IsFriend(selected) and "friend" or "add"))
                 end
                 if sent == 0 and failed > 0 then
-                    Library:Notify({ Type = "error", Title = "Kết bạn tất cả", Content = "Executor không hỗ trợ gửi lời mời hàng loạt", Duration = 4 })
+                    Library:Notify({ Type = "error", Title = L("friend_all_title"), Content = L("mass_unsupported"), Duration = 4 })
                 else
                     Library:Notify({
-                        Type = "success", Title = "Kết bạn tất cả",
-                        Content = string.format("Đã gửi %d • Bỏ qua %d • Lỗi %d", sent, skipped, failed),
+                        Type = "success", Title = L("friend_all_title"),
+                        Content = L("mass_result", sent, skipped, failed),
                         Duration = 4
                     })
                 end
@@ -1857,7 +2311,7 @@ function Library:CreateWindow(config)
         New("TextLabel", {
             Size = UDim2.new(1, 0, 0, 35),
             BackgroundTransparency = 1,
-            Text = "⚠️ Xác Nhận Xóa",
+            Text = L("confirm_title"),
             TextColor3 = Color3.fromRGB(255, 80, 80),
             Font = Enum.Font.GothamBold,
             TextSize = 16,
@@ -1868,7 +2322,7 @@ function Library:CreateWindow(config)
             Size = UDim2.new(1, -20, 0, 50),
             Position = UDim2.new(0, 10, 0, 40),
             BackgroundTransparency = 1,
-            Text = "Bạn có chắc chắn muốn\nXÓA HOÀN TOÀN menu này không?",
+            Text = L("confirm_body"),
             TextColor3 = TEXT_MAIN,
             Font = Enum.Font.GothamMedium,
             TextSize = 13,
@@ -1880,7 +2334,7 @@ function Library:CreateWindow(config)
             Size = UDim2.new(0, 120, 0, 34),
             Position = UDim2.new(0.5, -125, 1, -50),
             BackgroundColor3 = Color3.fromRGB(250, 60, 60),
-            Text = "Xác Nhận Xóa",
+            Text = L("confirm_yes"),
             TextColor3 = WHITE,
             Font = Enum.Font.GothamBold,
             TextSize = 13,
@@ -1892,7 +2346,7 @@ function Library:CreateWindow(config)
             Size = UDim2.new(0, 120, 0, 34),
             Position = UDim2.new(0.5, 5, 1, -50),
             BackgroundColor3 = Color3.fromRGB(50, 53, 65),
-            Text = "Hủy Bỏ",
+            Text = L("confirm_no"),
             TextColor3 = Color3.fromRGB(200, 200, 200),
             Font = Enum.Font.GothamBold,
             TextSize = 13,
@@ -1930,7 +2384,15 @@ function Library:CreateWindow(config)
 
     ParentGui(ScreenGui)
     task.wait(0.1)
-    OpenMenu()
+    if Settings.Intro and not introPlayed then
+        introPlayed = true
+        task.spawn(function()
+            PlayIntro()
+            if not destroyed then OpenMenu() end
+        end)
+    else
+        OpenMenu()
+    end
 
     local Window = { Pages = {}, TabButtons = {}, Flags = {} }
 
@@ -1955,7 +2417,7 @@ function Library:CreateWindow(config)
 
     function Window:SaveConfig(name)
         if not HasFileSystem() then
-            return false, "Executor không hỗ trợ writefile"
+            return false, L("err_nowrite")
         end
         local data = {}
         for flag, obj in pairs(Window.Flags) do
@@ -1963,7 +2425,7 @@ function Library:CreateWindow(config)
             if ok and value ~= nil then data[flag] = value end
         end
         local okEnc, encoded = pcall(function() return HttpService:JSONEncode(data) end)
-        if not okEnc then return false, "Không thể mã hóa cấu hình" end
+        if not okEnc then return false, L("err_encode") end
 
         if type(makefolder) == "function" and type(isfolder) == "function" and not isfolder("CyberVibe") then
             pcall(makefolder, "CyberVibe")
@@ -1975,17 +2437,17 @@ function Library:CreateWindow(config)
 
     function Window:LoadConfig(name)
         if not HasFileSystem() then
-            return false, "Executor không hỗ trợ readfile"
+            return false, L("err_noread")
         end
         local path = ConfigPath(name)
         if type(isfile) == "function" and not isfile(path) then
-            return false, "Không tìm thấy file cấu hình"
+            return false, L("err_nofile")
         end
         local okRead, raw = pcall(readfile, path)
         if not okRead then return false, tostring(raw) end
         local okDec, data = pcall(function() return HttpService:JSONDecode(raw) end)
         if not okDec or type(data) ~= "table" then
-            return false, "File cấu hình bị lỗi"
+            return false, L("err_badfile")
         end
         for flag, value in pairs(data) do
             local obj = Window.Flags[flag]
