@@ -1,0 +1,185 @@
+local I18N = { Lang = "vi", File = "CourierCatHub/Lang.dat" }
+I18N.Dict = {
+        ["Tiện ích"] = "Utility",
+        ["Người chơi"] = "Character",
+        ["Linh tinh"] = "Misc",
+        ["Tương tác"] = "Interact",
+        ["Nút nhảy"] = "Jump button",
+        ["Góc nhìn 3"] = "Third person",
+        ["Xuyên tường"] = "Wall pass",
+        ["Tắt ESP tạm thời"] = "Temporary ESP off",
+        ["Doors giải trí"] = "Doors fun",
+        ["Bật tốc độ"] = "Enable speed",
+        ["Tốc độ"] = "Speed",
+        ["Hiện nút nhảy"] = "Show jump button",
+        ["Khoá nút nhảy"] = "Lock jump button",
+        ["Nút góc nhìn 3"] = "Third person button",
+        ["Khoá nút góc nhìn"] = "Lock view button",
+        ["Tốc độ xuyên"] = "Pass speed",
+        ["Nút xuyên tường"] = "Wall pass button",
+        ["Khoá nút xuyên tường"] = "Lock wall pass button",
+        ["Nhảy vô hạn"] = "Infinite jump",
+        ["Mở cửa từ xa"] = "Remote door open",
+        ["Lưu cài đặt"] = "Save settings",
+        ["Tự tương tác"] = "Auto interact",
+        ["Tương tác nhanh"] = "Instant interact",
+        ["Tốc độ tương tác"] = "Interact speed",
+        ["Tốc độ mở cửa"] = "Door open speed",
+        ["Tầm mở cửa"] = "Door reach",
+        ["Tầm tương tác"] = "Interact reach",
+        ["Chơi lại"] = "Play again",
+        ["Về sảnh"] = "Back to lobby",
+        ["Hồi sinh"] = "Revive",
+        ["Bấm"] = "Press",
+        ["Tắt Jumpscare"] = "Disable jumpscare",
+        ["Đường Seek"] = "Seek path",
+        ["Màu Seek"] = "Seek color",
+        ["Đường Eyestalk"] = "Eyestalk path",
+        ["Màu Eyestalk"] = "Eyestalk color",
+        ["Xanh lá"] = "Green",
+        ["Hồng"] = "Pink",
+        ["Xanh biển"] = "Blue",
+        ["Đen"] = "Black",
+        ["Tự lái Minecart"] = "Auto steer Minecart",
+        ["Cự ly rẽ"] = "Turn distance",
+        ["Cự ly cúi"] = "Duck distance",
+        ["Bỏ chướng ngại"] = "Bypass obstacles",
+        ["Xoá trigger Seek"] = "Remove Seek trigger",
+        ["Xoá Figure"] = "Remove Figure",
+        ["Tự mở khoá thư viện"] = "Auto unlock library",
+        ["Cự ly mở khoá"] = "Unlock distance",
+        ["Tự giải cầu giao"] = "Auto solve breaker",
+        ["ESP Cửa"] = "Door ESP",
+        ["ESP Thực thể"] = "Entity ESP",
+        ["ESP Vật phẩm"] = "Item ESP",
+        ["ESP Người"] = "Player ESP",
+        ["ESP Rương"] = "Chest ESP",
+        ["ESP Chỗ trốn"] = "Hiding spot ESP",
+        ["ESP Thang"] = "Ladder ESP",
+        ["Hiện tên quái vật"] = "Show monster names",
+        ["Nút tắt ESP"] = "ESP off button",
+        ["Khoá nút tắt ESP"] = "Lock ESP off button",
+        ["ESP Cầu vồng"] = "Rainbow ESP",
+        ["khoảng cách"] = "Distance",
+        ["Đường Kẻ"] = "Tracers",
+        ["Cỡ chữ ESP"] = "ESP text size",
+        ["Bỏ Cutscene"] = "Skip cutscene",
+        ["Cảnh báo thực thể"] = "Entity alert",
+        ["Bật FOV"] = "Enable FOV",
+        ["Không rung camera"] = "No camera shake",
+        ["Khoá cứng camera"] = "Lock camera",
+        ["Góc nhìn thứ ba"] = "Third person view",
+        ["Chống camera xuyên tường"] = "Anti camera clip",
+        ["Xoá sương mù"] = "Remove fog",
+        ["Tắt ESP"] = "ESP off",
+        ["BẬT"] = "ON",
+        ["TẮT"] = "OFF",
+        ["Thông báo"] = "Notice",
+        ["Prompt tức thì"] = "Instant prompt",
+        ["Thư viện"] = "Library",
+        ["Con Mù"] = "Figure",
+        ["Bật lửa"] = "Lighter",
+        ["Đèn pin"] = "Flashlight",
+        ["Cậy cửa"] = "Lockpick",
+        ["Thuốc"] = "Vitamins",
+        ["Băng gạc"] = "Bandage",
+        ["Pin"] = "Battery",
+        ["Nến"] = "Candle",
+        ["Thánh giá"] = "Crucifix",
+        ["Que phát sáng"] = "Glowsticks",
+        ["Chìa khoá xương"] = "Skeleton key",
+        ["Bánh mì"] = "Bread",
+        ["Phô mai"] = "Cheese",
+        ["Máy tính bảng"] = "Tablet",
+        ["Kéo"] = "Shears",
+        ["Sinh tố"] = "Smoothie",
+        ["Đa dụng"] = "Multitool",
+        ["Cầu chì"] = "Fuse",
+        ["Chìa khoá"] = "Key",
+        ["Sách"] = "Book",
+        ["Cần gạt"] = "Lever",
+        ["Rương"] = "Chest",
+        ["Tủ"] = "Locker",
+        ["Tủ lớn"] = "Large locker",
+        ["Giường"] = "Bed",
+        ["Thang"] = "Ladder",
+        ["Máy"] = "Machine",
+}
+I18N.Frags = {
+        { "ESP Cửa", "Door ESP" },
+        { "ESP Thực thể", "Entity ESP" },
+        { "ESP Vật phẩm", "Item ESP" },
+        { "ESP Người", "Player ESP" },
+        { "ESP Rương", "Chest ESP" },
+        { "ESP Chỗ trốn", "Hiding spot ESP" },
+        { "ESP Thang", "Ladder ESP" },
+        { "Đang kéo bạn chậm về phía trước — nhìn hướng muốn đi", "Slowly pulling you forward — look where you want to go" },
+        { "Đã bật — tự đẩy va chạm xuống khi Figure tới gần", "Enabled — pushes collision down when Figure is near" },
+        { "Hãy tương tác với hộp cầu giao — sẽ tự động giải", "Interact with the breaker box — it will solve automatically" },
+        { "Đã bật — sẽ không bao giờ thua khi Figure bắt", "Enabled — never lose when Figure catches you" },
+        { "Đã bật — lần sau tự khôi phục các cài đặt", "Enabled — settings restore next time" },
+        { "Đã bật — tự nhập code khi tới gần ổ khoá", "Enabled — auto enters code near the padlock" },
+        { "Bật — sẽ tự giải khi gặp hộp cầu giao", "On — will solve when a breaker box appears" },
+        { "Đã giải thành công! Hãy tới thang máy", "Solved! Go to the elevator" },
+        { "Đã mở khoá thư viện thành công!", "Library unlocked!" },
+        { "Đã tắt — xoá cài đặt đã lưu", "Disabled — saved settings deleted" },
+        { "Vật phẩm hiếm vừa xuất hiện", "Rare item spawned" },
+        { "Đang giải... vui lòng đợi", "Solving... please wait" },
+        { "Đã bật tự động tương tác", "Auto interact enabled" },
+        { "Đã bật — bán kính ", "Enabled — radius " },
+        { "Prompt tức thì", "Instant prompt" },
+        { " — cách bạn ", " — away from you: " },
+        { "Thời gian: ", "Time: " },
+        { "Lưu cài đặt", "Save settings" },
+        { "Xuyên tường", "Wall pass" },
+        { "Chọn tắt: ", "Mute: " },
+        { "Xoá Figure", "Remove Figure" },
+        { "Thông báo", "Notice" },
+        { "Thư viện", "Library" },
+        { "đã load", "loaded" },
+        { "Đã bật", "Enabled" },
+        { "Đã tắt", "Disabled" },
+        { "Cửa ", "Door " },
+}
+table.sort(I18N.Frags, function(A, B) return #A[1] > #B[1] end)
+I18N.RDict, I18N.RFrags = {}, {}
+for K, V in pairs(I18N.Dict) do
+    if I18N.RDict[V] == nil then I18N.RDict[V] = K end
+end
+I18N.RDict["Figure"] = nil
+for _, Pair in ipairs(I18N.Frags) do
+    table.insert(I18N.RFrags, { Pair[2], Pair[1] })
+end
+table.sort(I18N.RFrags, function(A, B) return #A[1] > #B[1] end)
+function I18N.Convert(Text, ToEn)
+    if type(Text) ~= "string" or Text == "" then return Text end
+    local Dict, Frags = I18N.RDict, I18N.RFrags
+    if ToEn then Dict, Frags = I18N.Dict, I18N.Frags end
+    local Exact = Dict[Text]
+    if Exact then return Exact end
+    for _, Pair in ipairs(Frags) do
+        local Start, Stop = string.find(Text, Pair[1], 1, true)
+        while Start do
+            Text = string.sub(Text, 1, Start - 1) .. Pair[2] .. string.sub(Text, Stop + 1)
+            Start, Stop = string.find(Text, Pair[1], Start + #Pair[2], true)
+        end
+    end
+    return Text
+end
+function I18N.Tr(Text)
+    if I18N.Lang ~= "en" then return Text end
+    return I18N.Convert(Text, true)
+end
+function I18N.Save()
+    pcall(function() if typeof(writefile) == "function" then writefile(I18N.File, I18N.Lang) end end)
+end
+function I18N.Load()
+    pcall(function()
+        if typeof(isfile) == "function" and isfile(I18N.File) then
+            local V = string.gsub(readfile(I18N.File), "%s", "")
+            if V == "en" or V == "vi" then I18N.Lang = V end
+        end
+    end)
+end
+
+return I18N
