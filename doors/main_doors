@@ -77,7 +77,6 @@ BreakerBoxFinishedNotified = false,
 local SeekNodesFolder = Instance.new("Folder", Workspace); SeekNodesFolder.Name = _RandStr()
 local RoomsNodesFolder = Instance.new("Folder", Workspace); RoomsNodesFolder.Name = _RandStr()
 Globals.SeekNodesFolder = SeekNodesFolder
-Globals.SeekWaypoints = {}
 Globals.RoomsNodesFolder = RoomsNodesFolder
 
 local function GetHiddenUI()
@@ -980,7 +979,6 @@ AutoRevive=false,
 ShowSeekPathColor = Color3.fromRGB(0, 255, 0),
 ShowEyestalkPath=false, ShowEyestalkPathColor = Color3.fromRGB(0, 120, 255),
 BypassSeekObstructions=false, MinecartTurnDistance=30, MinecartDuckDistance=50,
-AutoSeekRun=false, AutoSeekSpeed=24,
 }
 
 local function MakeSection(Tab, Title, Open)
@@ -1481,12 +1479,6 @@ SecEye:AddSwitch("Đường Eyestalk", false, function(S) State.ShowEyestalkPath
 SecEye:AddDropdown("Màu Eyestalk", { "Xanh biển", "Hồng", "Xanh lá", "Đen" }, function(V)
     local C = Globals.ColorChoices[V]
     if C then State.ShowEyestalkPathColor = C; UpdateBeamColor(Objects.EyestalkHighlights, C) end
-end)
-
-SecSeek:AddSwitch("Tự chạy Seek (beta)", false, function(S) State.AutoSeekRun = S end)
-
-SecSeek:AddTextBox("Tốc độ bay Seek", "24", function(T)
-    State.AutoSeekSpeed = math.clamp(tonumber(T) or 24, 1, 60)
 end)
 
 SecSeek:AddSwitch("Tự lái Minecart", false, function(S) State.AutoSteerMinecart = S end)
@@ -2588,7 +2580,6 @@ elseif Name == "Padlock" then
         local function CreateSeekNode(Light)
             if Light.Name ~= "SeekGuidingLight" or Light:GetAttribute("Highlighted") then return end
             Light:SetAttribute("Highlighted", true)
-            table.insert(Globals.SeekWaypoints, Light.Position)
             local NewNode = Instance.new("Part")
             NewNode.Size = Vector3.one; NewNode.Transparency = 1; NewNode.Parent = Globals.SeekNodesFolder
             NewNode.Anchored = true; NewNode.CFrame = Light.CFrame; NewNode.CanCollide = false; NewNode.Name = "SeekLightNode"
@@ -2616,12 +2607,7 @@ elseif Name == "Padlock" then
         table.insert(Connections, PLConn); table.insert(Objects.PathLights, Object)
         Object.Destroying:Once(function() PLConn:Disconnect() end)
     elseif Name == "SeekMovingNewClone" then
-        Globals.SeekActive = true
-        Globals.SeekAutoIdx = nil
         local Conn = Object.Destroying:Connect(function()
-            Globals.SeekActive = false
-            Globals.SeekAutoIdx = nil
-            table.clear(Globals.SeekWaypoints)
             for _, Folder in pairs(Objects.PathLights) do if Folder and Folder.Parent then Folder:ClearAllChildren() end end
             if Globals.SeekNodesFolder then Globals.SeekNodesFolder:ClearAllChildren() end
             table.clear(Objects.SeekHighlights)
@@ -2907,229 +2893,6 @@ end
 end)
 
 Globals.LastDuck = 0
-local SeekCruise = 6
-
-local SeekCastParams = RaycastParams.new()
-SeekCastParams.FilterType = Enum.RaycastFilterType.Exclude
-pcall(function() SeekCastParams.RespectCanCollide = true end)
-
-local function SeekPathClear(Origin, Dir, Len, Radius)
-    if Dir.Magnitude < 0.001 then return true end
-    local Filter = { Globals.SeekNodesFolder }
-    if Character then table.insert(Filter, Character) end
-    SeekCastParams.FilterDescendantsInstances = Filter
-    local Vec = Dir.Unit * Len
-    local R = Radius or (Globals.SeekCrouching and 1.1 or 1.6)
-    local Ok, Hit = pcall(function() return Workspace:Spherecast(Origin, R, Vec, SeekCastParams) end)
-    if not Ok then
-        Ok, Hit = pcall(function() return Workspace:Raycast(Origin, Vec, SeekCastParams) end)
-        if not Ok then return true end
-    end
-    return Hit == nil
-end
-
-local function SeekSetCrouch(On)
-    if (Globals.SeekCrouching == true) == On then return end
-    Globals.SeekCrouching = On
-    local MG = Main_Game or Functions.GetMainGame()
-    if type(MG) == "table" and type(MG.crouch) == "function" then
-        pcall(function() MG.crouch(On) end)
-        return
-    end
-    if not Character then return end
-    if Floor == "Fools" or Floor == "OldHotel" then
-        pcall(function() Character:SetAttribute("Crouching", On) end)
-    elseif CollisionPart then
-        pcall(function()
-            if On then
-                Globals.SeekPrevGroup = CollisionPart.CollisionGroup
-                CollisionPart.CollisionGroup = "PlayerCrouching"
-            else
-                CollisionPart.CollisionGroup = Globals.SeekPrevGroup or "Player"
-            end
-        end)
-    end
-    pcall(function()
-        if RemotesFolder and RemotesFolder:FindFirstChild("Crouch") then RemotesFolder.Crouch:FireServer(On, true) end
-    end)
-end
-
-local function SeekResetAuto()
-    if Globals.SeekAutoMoving then
-        Globals.SeekAutoMoving = false
-        pcall(function() if Humanoid then Humanoid.Sit = false end end)
-    end
-    if Globals.SeekCrouching then SeekSetCrouch(false) end
-    Globals.SeekAlt = nil
-    Globals.SeekLow = nil
-    Globals.SeekHolePoint = nil
-    Globals.SeekHoleDir = nil
-    Globals.SeekHolePhase = nil
-end
-
-local function SeekNearDoor(Pos)
-    if tick() >= (Globals.SeekDoorScanAt or 0) then
-        Globals.SeekDoorScanAt = tick() + 0.5
-        local List = {}
-        pcall(function()
-            for _, Room in ipairs(CurrentRooms:GetChildren()) do
-                local D = Room:FindFirstChild("Door")
-                if D then table.insert(List, D:GetPivot().Position) end
-            end
-        end)
-        Globals.SeekDoors = List
-    end
-    for _, DP in ipairs(Globals.SeekDoors or {}) do
-        local D = DP - Pos
-        if Vector3.new(D.X, 0, D.Z).Magnitude < 16 and math.abs(D.Y) < 14 then return true end
-    end
-    return false
-end
-
-local function SeekScanHole(Pos, Base)
-    local Flat = Vector3.new(Base.X - Pos.X, 0, Base.Z - Pos.Z)
-    if Flat.Magnitude < 0.1 then return false end
-    local Fwd = Flat.Unit
-    local Right = Fwd:Cross(Vector3.yAxis)
-    local Best, BestScore
-    for X = -10, 10 do
-        for _, Y in ipairs({ -1, 0, 1, 2 }) do
-            local Origin = Pos + Right * X + Vector3.yAxis * Y
-            local Score = math.abs(X) + math.abs(Y) * 0.5
-            if (not BestScore or Score < BestScore) and SeekPathClear(Origin, Fwd, 16) then
-                local Side = Origin - Pos
-                if Side.Magnitude < 0.1 or SeekPathClear(Pos, Side, Side.Magnitude) then
-                    Best, BestScore = Origin, Score
-                end
-            end
-        end
-    end
-    if not Best then return false end
-    Globals.SeekHolePoint = Best
-    Globals.SeekHoleDir = Fwd
-    Globals.SeekHolePhase = 1
-    return true
-end
-
-Connections.AutoSeekRun = RunService.Heartbeat:Connect(function(Dt)
-    local Waypoints = Globals.SeekWaypoints
-    local Active = State.AutoSeekRun and Globals.SeekActive and Character and Humanoid and RootPart
-        and Humanoid.Health > 0 and #Waypoints > 1
-    if not Active then
-        SeekResetAuto()
-        Globals.SeekAutoIdx = nil
-        return
-    end
-    local Pos = RootPart.Position
-    local Idx = Globals.SeekAutoIdx or 1
-    local Limit = math.min(Idx + 6, #Waypoints)
-    for K = Idx, Limit do
-        local D = Waypoints[K] - Pos
-        if Vector3.new(D.X, 0, D.Z).Magnitude < 4 and math.abs(D.Y) < 12 then Idx = K + 1 end
-    end
-    Globals.SeekAutoIdx = Idx
-    if Idx > #Waypoints then
-        SeekResetAuto()
-        return
-    end
-    Globals.SeekAutoMoving = true
-    Humanoid.Sit = true
-
-    local Base = Waypoints[Idx]
-    local Move
-
-    if Globals.SeekHolePoint then
-        if Globals.SeekHolePhase == 1 then
-            local ToHole = Globals.SeekHolePoint - Pos
-            if ToHole.Magnitude < 1.2 then Globals.SeekHolePhase = 2 else Move = ToHole.Unit end
-        end
-        if Globals.SeekHolePhase == 2 then
-            local ToBase = Base - Pos
-            if SeekPathClear(Pos, ToBase, math.min(ToBase.Magnitude, 10)) then
-                Globals.SeekHolePoint = nil
-                Globals.SeekHoleDir = nil
-                Globals.SeekHolePhase = nil
-            else
-                Move = Globals.SeekHoleDir
-            end
-        end
-    end
-
-    if not Globals.SeekHolePoint then
-        local NearDoor = SeekNearDoor(Pos)
-        local Default = NearDoor and 0 or SeekCruise
-        local Alt = (Globals.SeekLow and 0) or (NearDoor and 0) or Globals.SeekAlt or SeekCruise
-        local Target = Base + Vector3.new(0, Alt, 0)
-        local Dir = Target - Pos
-        if SeekPathClear(Pos, Dir, math.min(Dir.Magnitude, 7)) then
-            Move = Dir.Unit
-            if Globals.SeekAlt and not Globals.SeekLow then
-                local DT = Base + Vector3.new(0, Default, 0) - Pos
-                if SeekPathClear(Pos, DT, math.min(DT.Magnitude, 10)) then Globals.SeekAlt = nil end
-            end
-            if Globals.SeekLow then
-                local ToBase = Base - Pos
-                if SeekPathClear(Pos, ToBase, math.min(ToBase.Magnitude, 10), 1.6) then
-                    if Globals.SeekCrouching then SeekSetCrouch(false) end
-                    Globals.SeekLow = nil
-                end
-            end
-        else
-            local Found
-            if not Globals.SeekLow then
-                for _, L in ipairs({ Alt + 3, Alt + 6, Default - 2, Default - 4, 0 }) do
-                    if L >= 0 and L ~= Alt then
-                        local D2 = Base + Vector3.new(0, L, 0) - Pos
-                        if SeekPathClear(Pos, D2, 7) then
-                            Globals.SeekAlt = L
-                            Move = D2.Unit
-                            Found = true
-                            break
-                        end
-                    end
-                end
-                if not Found then
-                    local Flat = Vector3.new(Dir.X, 0, Dir.Z)
-                    if Flat.Magnitude > 0.01 then
-                        local Right = Flat.Unit:Cross(Vector3.yAxis)
-                        local First = Globals.SeekSide or 1
-                        for _, Off in ipairs({ 2, 4, 6 }) do
-                            for _, Sign in ipairs({ First, -First }) do
-                                local Cand = (Dir.Unit * 5 + Right * Sign * Off).Unit
-                                if SeekPathClear(Pos, Cand, 7) then
-                                    Globals.SeekSide = Sign
-                                    Move = Cand
-                                    Found = true
-                                    break
-                                end
-                            end
-                            if Found then break end
-                        end
-                    end
-                end
-            end
-            if not Found then
-                Globals.SeekLow = true
-                if Pos.Y - Base.Y > 1.5 and SeekPathClear(Pos, Vector3.new(0, -1, 0), 2) then
-                    Move = Vector3.new(0, -1, 0)
-                elseif not Globals.SeekCrouching then
-                    SeekSetCrouch(true)
-                    Globals.SeekScanAt = tick() + 0.3
-                elseif tick() >= (Globals.SeekScanAt or 0) then
-                    Globals.SeekScanAt = tick() + 0.3
-                    SeekScanHole(Pos, Base)
-                end
-            end
-        end
-    end
-
-    if Move then
-        RootPart.AssemblyLinearVelocity = Move * State.AutoSeekSpeed
-    else
-        RootPart.AssemblyLinearVelocity = Vector3.zero
-    end
-end)
-
 Connections.AutoSteerMinecartDuckHandler = RunService.Heartbeat:Connect(function()
     if not State.AutoSteerMinecart or not Functions.GetMinecart() then return end
     if tick() - Globals.LastDuck < 0.1 then return end
