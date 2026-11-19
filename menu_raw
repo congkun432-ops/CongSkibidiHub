@@ -81,9 +81,8 @@ local function SafeCall(cb, ...)
     if not ok then warn("[CyberVibe] " .. tostring(err)) end
 end
 
--- ===================== CÀI ĐẶT (LƯU FILE) + NGÔN NGỮ =====================
 local SETTINGS_FILE = "CyberVibe_Settings.json"
-local Settings      = { Language = "en", Intro = true }   -- mặc định: tiếng Anh, bật intro
+local Settings      = { Language = "en", Intro = true }
 local introPlayed   = false
 
 local function SaveSettings()
@@ -174,7 +173,6 @@ local function L(key, ...)
     return str
 end
 
--- Mỗi hook gắn với 1 instance; instance bị Destroy (Parent = nil) thì hook tự bị gỡ.
 local langHooks = {}
 local function OnLang(owner, fn)
     SafeCall(fn)
@@ -319,12 +317,8 @@ local function EnsureNotifyGui()
     return NotifyGui
 end
 
--- ===================== INTRO (module riêng: CyberVibe_Intro.luau) =====================
--- Thư viện không còn chứa code animation. Nạp bằng:
---   Library:SetIntro(loadstring(readfile("CyberVibe_Intro.luau"))())
---   Library:LoadIntro("CyberVibe_Intro.luau")  -- đường dẫn file hoặc URL
--- Không nạp intro thì menu mở thẳng, không lỗi.
 local IntroPlayer = nil
+local INTRO_URL = "https://raw.githubusercontent.com/congkun432-ops/CongSkibidiHub/refs/heads/main/intro"
 
 function Library:SetIntro(fn)
     IntroPlayer = type(fn) == "function" and fn or nil
@@ -426,7 +420,6 @@ function Library:Notify(config)
     local NotifStroke = Stroke(Notif, Accent, 1, 1)
     NotifStroke.ZIndex = 3
 
-    -- Huy hiệu icon tròn, nền là màu nhấn đã làm nhạt
     local IconBadge = New("Frame", {
         Size = UDim2.new(0, 20, 0, 20),
         Position = UDim2.new(0, 9, 0, 7),
@@ -476,7 +469,6 @@ function Library:Notify(config)
         ZIndex = 3
     }, Notif)
 
-    -- Thanh thời gian mảnh ở đáy
     local BarTrack = New("Frame", {
         Size = UDim2.new(1, -20, 0, 2),
         Position = UDim2.new(0, 10, 1, -6),
@@ -672,7 +664,6 @@ function Library:CreateWindow(config)
     Corner(MainFrame, UDim.new(0, 10))
     local MainStroke = Stroke(MainFrame, ACCENT, 1.5)
 
-    -- Ảnh nền menu (mặc định lấy ảnh của menu nhỏ; chỉnh trong tab thông tin)
     local BgImage = New("ImageLabel", {
         Name = "BgImage",
         Size = UDim2.new(1, 0, 1, 0),
@@ -727,7 +718,6 @@ function Library:CreateWindow(config)
     local MinimizeBtn = HeaderButton(-72, Color3.fromRGB(54, 59, 72), "–", 14)
     local DestroyBtn  = HeaderButton(-106, Color3.fromRGB(180, 40, 40), "D", 13)
 
-    -- Viền: cầu vồng (bật/tắt được) hoặc màu cố định. Khi tắt cầu vồng thì không còn vòng lặp nào chạy.
     local rainbowOn     = true
     local borderColor   = ACCENT
     local rainbowConn   = nil
@@ -954,24 +944,22 @@ function Library:CreateWindow(config)
     CloseBtn.MouseButton1Click:Connect(CloseMenu)
     MinimizeBtn.MouseButton1Click:Connect(MinimizeMenu)
 
-    -- ===================== TAB THÔNG TIN + TÙY CHỈNH GIAO DIỆN (bên phải menu) =====================
     do
         local lp           = Players.LocalPlayer
         local ARROW_W      = 22
         local GAP          = 4
         local PAD          = 3
-        local INFO_W       = math.max(90, math.floor(FULL_W / 3) - 6) -- luôn nhỏ hơn 1/3 menu chính
-        local IN_W         = INFO_W - 12                              -- bề rộng khả dụng trong vùng cuộn
+        local INFO_W       = math.max(90, math.floor(FULL_W / 3) - 6)
+        local IN_W         = INFO_W - 12
         local OPEN_X       = GAP
         local CLOSED_X     = -INFO_W - 6
-        local ARROW_OPEN_X = GAP + INFO_W + GAP                       -- mũi tên nằm NGOÀI CÙNG bên phải khi mở
+        local ARROW_OPEN_X = GAP + INFO_W + GAP
         local DOCK_W       = ARROW_OPEN_X + ARROW_W + 3
         local infoOpen     = false
         local fpsConn      = nil
         local fastInfo     = TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
         local slideInfo    = TweenInfo.new(0.35, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
 
-        -- Dock cắt phần panel đang thu lại; nằm ngoài MainFrame (MainFrame có ClipsDescendants)
         local Dock = New("Frame", {
             Name = "InfoDock",
             Size = UDim2.new(0, DOCK_W, 0, FULL_H + PAD * 2),
@@ -992,7 +980,6 @@ function Library:CreateWindow(config)
         Corner(Panel, UDim.new(0, 10))
         table.insert(borderTargets, Stroke(Panel, ACCENT, 1.5))
 
-        -- Phần đầu cố định: avatar + tên
         local Avatar = New("ImageLabel", {
             Size = UDim2.new(0, 34, 0, 34),
             Position = UDim2.new(0, 8, 0, 7),
@@ -1070,7 +1057,6 @@ function Library:CreateWindow(config)
             OnLang(lbl, function() lbl.Text = L(key) end)
         end
 
-        -- ============ NGÔN NGỮ ============
         Section("sec_lang")
         do
             local LangRow = New("Frame", {
@@ -1116,7 +1102,6 @@ function Library:CreateWindow(config)
             OnLang(LangRow, MarkLang)
         end
 
-        -- ============ KHỞI ĐỘNG: bật/tắt intro (lưu lại) ============
         Section("sec_startup")
         do
             local IntroRow = New("TextButton", {
@@ -1179,7 +1164,6 @@ function Library:CreateWindow(config)
             end)
         end
 
-        -- ============ GIAO DIỆN: viền ============
         Section("sec_border")
 
         local RainbowRow = New("TextButton", {
@@ -1224,7 +1208,6 @@ function Library:CreateWindow(config)
             Tween(SwKnob, fastInfo, { Position = rainbowOn and UDim2.new(1, -12, 0.5, -5) or UDim2.new(0, 2, 0.5, -5) })
         end
 
-        -- Ô chọn màu viền
         local SWATCH_COLORS = {
             ACCENT,
             Color3.fromRGB(150, 90, 255),
@@ -1280,10 +1263,9 @@ function Library:CreateWindow(config)
             if rainbowOn then MarkSwatch(nil) end
         end)
 
-        -- ============ GIAO DIỆN: nền menu ============
         Section("sec_bg")
 
-        local bgMode      = "icon"   -- icon | none | custom
+        local bgMode      = "icon"
         local customImage = ""
 
         local Tiles = New("Frame", {
@@ -1293,7 +1275,6 @@ function Library:CreateWindow(config)
             ZIndex = 4
         }, Scroll)
 
-        -- Ô 1: tự lấy ảnh của menu nhỏ
         local TileIcon = New("ImageButton", {
             Size = UDim2.new(0.5, -2, 1, 0),
             BackgroundColor3 = BG_CONTROL,
@@ -1318,7 +1299,6 @@ function Library:CreateWindow(config)
         Corner(TileCap, UDim.new(0, 6))
         OnLang(TileCap, function() TileCap.Text = L("tile_icon") end)
 
-        -- Ô 2: nền trơn
         local TileNone = New("TextButton", {
             Size = UDim2.new(0.5, -2, 1, 0),
             Position = UDim2.new(0.5, 2, 0, 0),
@@ -1364,7 +1344,6 @@ function Library:CreateWindow(config)
             if bgMode == "icon" then ApplyBg() end
         end)
 
-        -- Độ hiện của ảnh nền
         local OpRow = New("Frame", {
             Size = UDim2.new(1, -4, 0, 24),
             BackgroundColor3 = BG_CONTROL,
@@ -1402,11 +1381,10 @@ function Library:CreateWindow(config)
             }, OpRow)
             b.MouseButton1Click:Connect(function() StepOpacity(delta) end)
         end
-        StepButton("-", UDim2.new(0, 0, 0, 0), 0.1)   -- giảm độ hiện => tăng trong suốt
+        StepButton("-", UDim2.new(0, 0, 0, 0), 0.1)
         StepButton("+", UDim2.new(1, -22, 0, 0), -0.1)
         RefreshOpacity()
 
-        -- Nhập ID ảnh tùy chọn
         local IdBox = New("TextBox", {
             Size = UDim2.new(1, -4, 0, 24),
             BackgroundColor3 = BG_CONTROL,
@@ -1438,9 +1416,8 @@ function Library:CreateWindow(config)
             ApplyBg()
         end)
 
-        ApplyBg() -- mặc định: dùng ảnh của menu nhỏ làm nền menu lớn
+        ApplyBg()
 
-        -- ============ THÔNG TIN NGƯỜI CHƠI ============
         Section("sec_info")
 
         local function Row(label)
@@ -1488,7 +1465,6 @@ function Library:CreateWindow(config)
         local vPing  = Row("f_ping")
         local vFps   = Row("f_fps")
 
-        -- Thông tin tĩnh: chỉ đặt 1 lần
         vId.Text  = tostring(lp.UserId)
         OnLang(vAge, function()
             vAge.Text = L("days", lp.AccountAge)
@@ -1532,9 +1508,8 @@ function Library:CreateWindow(config)
             vPing.Text = okPing and (math.floor(ping * 1000) .. " ms") or "-"
         end
 
-        OnLang(vTeam, Refresh) -- đổi ngôn ngữ thì làm mới chữ ("Không có"...)
+        OnLang(vTeam, Refresh)
 
-        -- Mũi tên: khi thu nằm sát menu, khi mở dịch ra ngoài cùng bên phải panel
         local Arrow = New("TextButton", {
             Name = "InfoArrow",
             Size = UDim2.new(0, ARROW_W, 0, 64),
@@ -1551,7 +1526,6 @@ function Library:CreateWindow(config)
         Corner(Arrow, UDim.new(0, 8))
         table.insert(borderTargets, Stroke(Arrow, ACCENT, 1.5))
 
-        -- Chỉ cập nhật số liệu mỗi 1 giây và chỉ khi tab đang mở (không tốn CPU khi thu lại)
         local function StartLive()
             if fpsConn then return end
             local frames, acc = 0, 0
@@ -1585,7 +1559,6 @@ function Library:CreateWindow(config)
             SetInfo(not infoOpen)
         end)
 
-        -- Bám theo MainFrame (sự kiện, không polling). Chỉ hiện khi menu đã mở đủ kích thước.
         local function Sync()
             local sz, pos = MainFrame.Size, MainFrame.Position
             local ready = MainFrame.Visible and sz.X.Offset >= FULL_W - 2 and sz.Y.Offset >= FULL_H - 2
@@ -1604,20 +1577,19 @@ function Library:CreateWindow(config)
         Sync()
     end
 
-    -- ===================== TAB NGƯỜI CHƠI TRONG SERVER (bên trái menu) =====================
     do
         local lp             = Players.LocalPlayer
         local StarterGui     = game:GetService("StarterGui")
         local ARROW_W        = 22
         local GAP            = 4
         local PAD            = 3
-        local INFO_W         = math.max(90, math.floor(FULL_W / 3) - 6) -- nhỏ hơn 1/3 menu chính
+        local INFO_W         = math.max(90, math.floor(FULL_W / 3) - 6)
         local IN_W           = INFO_W - 12
         local DOCK_W         = 3 + ARROW_W + GAP + INFO_W + GAP
         local OPEN_X         = 3 + ARROW_W + GAP
         local CLOSED_X       = DOCK_W + 6
-        local ARROW_OPEN_X   = 3                      -- mũi tên nằm NGOÀI CÙNG bên trái khi mở
-        local ARROW_CLOSED_X = DOCK_W - ARROW_W       -- khi thu: sát menu
+        local ARROW_OPEN_X   = 3
+        local ARROW_CLOSED_X = DOCK_W - ARROW_W
         local panelOpen      = false
         local selected       = nil
         local sending        = false
@@ -1643,7 +1615,6 @@ function Library:CreateWindow(config)
         Corner(Panel, UDim.new(0, 10))
         table.insert(borderTargets, Stroke(Panel, ACCENT, 1.5))
 
-        -- Tiêu đề + số người
         local TitleLbl = New("TextLabel", {
             Size = UDim2.new(1, -12, 0, 22),
             Position = UDim2.new(0, 6, 0, 3),
@@ -1662,7 +1633,6 @@ function Library:CreateWindow(config)
             TitleLbl.Text = L("players_cnt", #Players:GetPlayers())
         end
 
-        -- Nút kết bạn tất cả (đặt phía trên tab con)
         local AllBtn = New("TextButton", {
             Size = UDim2.new(1, -16, 0, 26),
             Position = UDim2.new(0, 8, 0, 28),
@@ -1679,7 +1649,6 @@ function Library:CreateWindow(config)
         New("UITextSizeConstraint", { MaxTextSize = 11, MinTextSize = 8 }, AllBtn)
         New("UIPadding", { PaddingLeft = UDim.new(0, 4), PaddingRight = UDim.new(0, 4) }, AllBtn)
 
-        -- Vùng nội dung: lưới avatar  <->  tab con chi tiết
         local Content = New("Frame", {
             Size = UDim2.new(1, -8, 1, -62),
             Position = UDim2.new(0, 4, 0, 58),
@@ -1722,7 +1691,6 @@ function Library:CreateWindow(config)
             return "rbxthumb://type=AvatarHeadShot&id=" .. userId .. "&w=150&h=150"
         end
 
-        -- ============ TAB CON: chi tiết người chơi ============
         local BackBtn = New("TextButton", {
             Size = UDim2.new(1, -4, 0, 22),
             BackgroundColor3 = BG_CONTROL,
@@ -1814,7 +1782,6 @@ function Library:CreateWindow(config)
         }, DetailView)
         Corner(FriendBtn, UDim.new(0, 6))
 
-        -- ============ Logic kết bạn / số bạn bè ============
         local friendCache = {}
         local sentTo      = {}
 
@@ -1880,7 +1847,7 @@ function Library:CreateWindow(config)
             if friendState ~= "self" then SetFriendBtn(friendState) end
         end)
 
-        local friendsVal = nil -- nil | "loading" | "fail" | number
+        local friendsVal = nil
         local function RenderFriends()
             if friendsVal == "loading" then vFriends.Text = L("loading")
             elseif friendsVal == "fail" then vFriends.Text = L("unavailable")
@@ -1955,7 +1922,6 @@ function Library:CreateWindow(config)
             end
         end)
 
-        -- ============ Lưới avatar ============
         local order = 0
         local function AddPlayer(plr)
             if cells[plr] then return end
@@ -2010,7 +1976,6 @@ function Library:CreateWindow(config)
             AllBtn.Text = (sending and sendN > 0) and L("sending", sendI, sendN) or L("friend_all")
         end)
 
-        -- ============ Kết bạn tất cả ============
         AllBtn.MouseButton1Click:Connect(function()
             if sending then return end
             local targets = {}
@@ -2036,7 +2001,7 @@ function Library:CreateWindow(config)
                         else
                             failed = failed + 1
                         end
-                        task.wait(0.6) -- giãn cách để tránh bị chặn vì gửi quá nhanh
+                        task.wait(0.6)
                     else
                         skipped = skipped + 1
                     end
@@ -2059,7 +2024,6 @@ function Library:CreateWindow(config)
             end)
         end)
 
-        -- ============ Mũi tên: thu = sát menu, mở = ngoài cùng bên trái ============
         local Arrow = New("TextButton", {
             Name = "PlayersArrow",
             Size = UDim2.new(0, ARROW_W, 0, 64),
@@ -2087,7 +2051,6 @@ function Library:CreateWindow(config)
             SetOpen(not panelOpen)
         end)
 
-        -- Bám theo mép trái của MainFrame (sự kiện, không polling)
         local function Sync()
             local sz, pos = MainFrame.Size, MainFrame.Position
             local ready = MainFrame.Visible and sz.X.Offset >= FULL_W - 2 and sz.Y.Offset >= FULL_H - 2
@@ -2237,9 +2200,10 @@ function Library:CreateWindow(config)
 
     ParentGui(ScreenGui)
     task.wait(0.1)
-    if Settings.Intro and IntroPlayer and not introPlayed then
+    if Settings.Intro and not introPlayed then
         introPlayed = true
         task.spawn(function()
+            if not IntroPlayer then Library:LoadIntro(INTRO_URL) end
             PlayIntro(string.upper(AuthorName), HubName)
             if not destroyed then OpenMenu() end
         end)
@@ -2843,15 +2807,12 @@ function Library:CreateWindow(config)
                 return Register(flag, obj)
             end
 
-            ------------------------------------------------------------
-            -- SECTION (tab con xổ xuống / thu lại)
-            ------------------------------------------------------------
             function Api:AddSection(title, defaultOpen, callback, flag)
                 title = tostring(title or "Section")
                 local isOpen      = defaultOpen and true or false
                 local PAD_V       = 6
                 local HEADER_H    = 34
-                local RIGHT_RESERVE = 68      -- chỗ dành cho badge + nút mũi tên bên phải
+                local RIGHT_RESERVE = 68
                 local heightTween = nil
                 local visToken    = 0
                 local hovering    = false
@@ -2867,9 +2828,6 @@ function Library:CreateWindow(config)
                     SortOrder = Enum.SortOrder.LayoutOrder
                 }, Holder)
 
-                ------------------------------------------------------------
-                -- THANH TIÊU ĐỀ
-                ------------------------------------------------------------
                 local Header = New("TextButton", {
                     Name = "Header",
                     Size = UDim2.new(1, 0, 0, HEADER_H),
@@ -2886,7 +2844,6 @@ function Library:CreateWindow(config)
                     Rotation = 90
                 }, Header)
 
-                -- Thanh nhấn bên trái (dài ra + sáng lên khi mở)
                 local Bar = New("Frame", {
                     Name = "AccentBar",
                     AnchorPoint = Vector2.new(0, 0.5),
@@ -2919,7 +2876,6 @@ function Library:CreateWindow(config)
                     ZIndex = 5
                 }, Header)
 
-                -- Huy hiệu hiển thị số chức năng bên trong
                 local Badge = New("Frame", {
                     Name = "Badge",
                     AnchorPoint = Vector2.new(1, 0.5),
@@ -2939,7 +2895,6 @@ function Library:CreateWindow(config)
                     ZIndex = 6
                 }, Badge)
 
-                -- Nút mũi tên dạng chip bo tròn
                 local Chip = New("Frame", {
                     Name = "Chip",
                     AnchorPoint = Vector2.new(1, 0.5),
@@ -2974,9 +2929,6 @@ function Library:CreateWindow(config)
                 end
                 LayoutHeader()
 
-                ------------------------------------------------------------
-                -- THÂN SECTION (có đường dẫn thụt lề bên trái)
-                ------------------------------------------------------------
                 local Wrap = New("Frame", {
                     Name = "Body",
                     Size = UDim2.new(1, 0, 0, 0),
@@ -2999,7 +2951,6 @@ function Library:CreateWindow(config)
                 }, Wrap)
                 Corner(Guide, UDim.new(1, 0))
 
-                -- Body = nơi chứa control (GetContainer trả về Frame này)
                 local Body = New("Frame", {
                     Name = "Content",
                     Position = UDim2.new(0, 17, 0, 0),
@@ -3016,7 +2967,6 @@ function Library:CreateWindow(config)
                     SortOrder = Enum.SortOrder.LayoutOrder
                 }, Body)
 
-                -- Cập nhật số chức năng trên huy hiệu
                 local function RefreshBadge()
                     local n = 0
                     for _, c in ipairs(Body:GetChildren()) do
@@ -3053,7 +3003,6 @@ function Library:CreateWindow(config)
                         heightTween = nil
                     end
 
-                    -- Chiều cao thân
                     if isOpen then
                         Wrap.Visible = true
                         if animate then
@@ -3075,7 +3024,6 @@ function Library:CreateWindow(config)
                         end
                     end
 
-                    -- Màu sắc / hiệu ứng thanh tiêu đề
                     local arrowRot = isOpen and 0 or -90
                     local hdrColor = hovering and COL_HOVER or BaseColor()
                     if animate then
@@ -3106,7 +3054,6 @@ function Library:CreateWindow(config)
                     end
                 end
 
-                -- Nội dung thay đổi (thêm control / section con đang xổ) -> cập nhật chiều cao
                 ContentLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
                     if isOpen then
                         if heightTween then
@@ -3137,7 +3084,6 @@ function Library:CreateWindow(config)
                     SafeCall(callback, isOpen)
                 end)
 
-                -- Section có đầy đủ AddSwitch / AddSlider / AddButton / AddDropdown / AddTextBox / AddSection
                 local Section = BuildControls(Body)
 
                 local function SetState(v)
