@@ -112,7 +112,7 @@ local STRINGS = {
         sec_border = "MENU BORDER", rainbow = "Rainbow",
         sec_bg = "MENU BACKGROUND", tile_icon = "Mini menu", tile_plain = "Plain",
         id_ph = "Image ID + Enter", bg_title = "Background", bg_invalid = "Invalid image ID",
-        sec_info = "INFO",
+        sec_info = "INFO", intro_skip = "Tap to skip",
         f_userid = "User ID", f_age = "Account age", f_plan = "Plan", f_team = "Team",
         f_hp = "Health", f_speed = "Walk speed", f_jump = "Jump power", f_pos = "Position",
         f_ping = "Ping", f_fps = "FPS",
@@ -140,7 +140,7 @@ local STRINGS = {
         sec_border = "VIỀN MENU", rainbow = "Cầu vồng",
         sec_bg = "NỀN MENU", tile_icon = "Menu nhỏ", tile_plain = "Trơn",
         id_ph = "ID ảnh + Enter", bg_title = "Hình nền", bg_invalid = "ID ảnh không hợp lệ",
-        sec_info = "THÔNG TIN",
+        sec_info = "THÔNG TIN", intro_skip = "Chạm để bỏ qua",
         f_userid = "User ID", f_age = "Tuổi tài khoản", f_plan = "Gói", f_team = "Đội",
         f_hp = "Máu", f_speed = "Tốc độ chạy", f_jump = "Sức nhảy", f_pos = "Vị trí",
         f_ping = "Ping", f_fps = "FPS",
@@ -319,194 +319,47 @@ local function EnsureNotifyGui()
     return NotifyGui
 end
 
--- ===================== INTRO: 2 CHỮ C GHÉP THÀNH CON MẮT =====================
--- Chỉnh nhanh: EYE_GAP = khoảng cách 2 chữ C so với tâm, EYE_Y = độ cao con mắt
-local function PlayIntro()
-    local EYE_GAP, EYE_Y, LOGO_Y = 50, 56, 60
-    local skipped = false
-    local vp = GetViewport()
-    local scale = math.clamp(math.min(vp.X, vp.Y) / 430, 0.6, 1.25)
+-- ===================== INTRO (module riêng: CyberVibe_Intro.luau) =====================
+-- Thư viện không còn chứa code animation. Nạp bằng:
+--   Library:SetIntro(loadstring(readfile("CyberVibe_Intro.luau"))())
+--   Library:LoadIntro("CyberVibe_Intro.luau")  -- đường dẫn file hoặc URL
+-- Không nạp intro thì menu mở thẳng, không lỗi.
+local IntroPlayer = nil
 
-    local gui = New("ScreenGui", {
-        Name = "CyberVibe_Intro_" .. math.random(1000, 9999),
-        ResetOnSpawn = false,
-        IgnoreGuiInset = true,
-        DisplayOrder = 1000,
-        ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-    })
-    ParentGui(gui)
+function Library:SetIntro(fn)
+    IntroPlayer = type(fn) == "function" and fn or nil
+end
 
-    local function Run()
-        local PURPLE = Color3.fromRGB(150, 90, 255)
-
-        -- Nền mờ; bấm vào đâu cũng bỏ qua intro
-        local Dim = New("TextButton", {
-            Size = UDim2.new(1, 0, 1, 0),
-            BackgroundColor3 = Color3.fromRGB(8, 9, 13),
-            BackgroundTransparency = 1,
-            Text = "",
-            AutoButtonColor = false,
-            ZIndex = 1
-        }, gui)
-        Dim.MouseButton1Click:Connect(function() skipped = true end)
-
-        local Root = New("Frame", {
-            AnchorPoint = Vector2.new(0.5, 0.5),
-            Position = UDim2.new(0.5, 0, 0.5, 0),
-            Size = UDim2.new(0, 320, 0, 220),
-            BackgroundTransparency = 1,
-            Active = false,
-            ZIndex = 2
-        }, gui)
-        local RootScale = New("UIScale", { Scale = scale * 0.92 }, Root)
-
-        local function MakeC(startX, rot)
-            local lbl = New("TextLabel", {
-                AnchorPoint = Vector2.new(0.5, 0.5),
-                Position = UDim2.new(0.5, startX, 0, LOGO_Y),
-                Size = UDim2.new(0, 100, 0, 120),
-                BackgroundTransparency = 1,
-                Font = Enum.Font.GothamBlack,
-                Text = "C",
-                TextSize = 100,
-                TextColor3 = WHITE,
-                TextTransparency = 1,
-                Rotation = rot,
-                ZIndex = 3
-            }, Root)
-            local grad = New("UIGradient", {
-                Color = ColorSequence.new(ACCENT, PURPLE),
-                Rotation = 45
-            }, lbl)
-            local st = New("UIStroke", {
-                Color = ACCENT,
-                Thickness = 2,
-                Transparency = 1,
-                ApplyStrokeMode = Enum.ApplyStrokeMode.Contextual
-            }, lbl)
-            return lbl, grad, st
+function Library:LoadIntro(source)
+    local ok, fn = pcall(function()
+        local code
+        if type(isfile) == "function" and type(readfile) == "function" and isfile(source) then
+            code = readfile(source)
+        else
+            code = game:HttpGet(source)
         end
-
-        local CL, GradL, StL = MakeC(-EYE_GAP - 110, 0)
-        local CR, GradR, StR = MakeC(EYE_GAP + 110, 180)
-
-        -- Con mắt: tròng + đồng tử
-        local Iris = New("Frame", {
-            AnchorPoint = Vector2.new(0.5, 0.5),
-            Position = UDim2.new(0.5, 0, 0, EYE_Y),
-            Size = UDim2.new(0, 0, 0, 0),
-            BackgroundColor3 = BG_CONTROL,
-            ClipsDescendants = true,
-            ZIndex = 4
-        }, Root)
-        Corner(Iris, UDim.new(1, 0))
-        local IrisStroke = Stroke(Iris, ACCENT, 2)
-
-        local Pupil = New("Frame", {
-            AnchorPoint = Vector2.new(0.5, 0.5),
-            Position = UDim2.new(0.5, 0, 0.5, 0),
-            Size = UDim2.new(0, 14, 0, 14),
-            BackgroundColor3 = WHITE,
-            ZIndex = 5
-        }, Iris)
-        Corner(Pupil, UDim.new(1, 0))
-        New("Frame", { -- điểm sáng nhỏ trong đồng tử
-            Position = UDim2.new(0, 3, 0, 3),
-            Size = UDim2.new(0, 4, 0, 4),
-            BackgroundColor3 = ACCENT,
-            ZIndex = 6
-        }, Pupil)
-        Corner(Pupil:FindFirstChildOfClass("Frame"), UDim.new(1, 0))
-
-        local Title = New("TextLabel", {
-            AnchorPoint = Vector2.new(0.5, 0),
-            Position = UDim2.new(0.5, 0, 0, 142),
-            Size = UDim2.new(0, 300, 0, 26),
-            BackgroundTransparency = 1,
-            Font = Enum.Font.GothamBold,
-            Text = "C O U R I E R   C A T",
-            TextSize = 16,
-            TextColor3 = TEXT_MAIN,
-            TextTransparency = 1,
-            ZIndex = 3
-        }, Root)
-
-        local BarTrack = New("Frame", {
-            AnchorPoint = Vector2.new(0.5, 0),
-            Position = UDim2.new(0.5, 0, 0, 182),
-            Size = UDim2.new(0, 140, 0, 3),
-            BackgroundColor3 = BG_OFF,
-            BackgroundTransparency = 1,
-            ZIndex = 3
-        }, Root)
-        Corner(BarTrack, UDim.new(1, 0))
-        local BarFill = New("Frame", {
-            Size = UDim2.new(0, 0, 1, 0),
-            BackgroundColor3 = ACCENT,
-            ZIndex = 4
-        }, BarTrack)
-        Corner(BarFill, UDim.new(1, 0))
-
-        local function W(t)
-            local e = 0
-            while e < t and not skipped do
-                e = e + task.wait(0.03)
-            end
-        end
-
-        local quint = TweenInfo.new(0.8, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
-        local look  = TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.InOut)
-        local mid   = UDim2.new(0.5, 0, 0.5, 0)
-
-        -- 1) Nền mờ + 2 chữ C trượt vào từ hai bên
-        Tween(Dim, TweenInfo.new(0.35), { BackgroundTransparency = 0.35 })
-        Tween(RootScale, TweenInfo.new(1.1, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), { Scale = scale })
-        W(0.1)
-        Tween(CL, quint, { Position = UDim2.new(0.5, -EYE_GAP, 0, LOGO_Y), TextTransparency = 0 })
-        Tween(CR, quint, { Position = UDim2.new(0.5, EYE_GAP, 0, LOGO_Y), TextTransparency = 0 })
-        Tween(StL, quint, { Transparency = 0.55 })
-        Tween(StR, quint, { Transparency = 0.55 })
-        Tween(GradL, TweenInfo.new(3, Enum.EasingStyle.Linear), { Rotation = 225 })
-        Tween(GradR, TweenInfo.new(3, Enum.EasingStyle.Linear), { Rotation = 225 })
-        Tween(BarTrack, TweenInfo.new(0.4), { BackgroundTransparency = 0 })
-        Tween(BarFill, TweenInfo.new(2.6, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), { Size = UDim2.new(1, 0, 1, 0) })
-        W(0.75)
-
-        -- 2) Con mắt mở ra giữa 2 chữ C + tiêu đề hiện lên
-        Tween(Iris, TweenInfo.new(0.45, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Size = UDim2.new(0, 30, 0, 30) })
-        Tween(Title, TweenInfo.new(0.6, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { TextTransparency = 0 })
-        W(0.45)
-
-        -- 3) Mắt nhìn trái -> phải -> giữa
-        Tween(Pupil, look, { Position = UDim2.new(0.5, -6, 0.5, 0) }); W(0.4)
-        Tween(Pupil, look, { Position = UDim2.new(0.5, 6, 0.5, 0) });  W(0.45)
-        Tween(Pupil, look, { Position = mid });                        W(0.25)
-
-        -- 4) Chớp mắt
-        Tween(Iris, TweenInfo.new(0.09, Enum.EasingStyle.Quad, Enum.EasingDirection.In), { Size = UDim2.new(0, 30, 0, 3) })
-        W(0.1)
-        Tween(Iris, TweenInfo.new(0.14, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { Size = UDim2.new(0, 30, 0, 30) })
-        W(0.45)
-
-        -- 5) Mờ dần rồi biến mất
-        local out = TweenInfo.new(0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
-        Tween(Dim, out, { BackgroundTransparency = 1 })
-        Tween(CL, out, { TextTransparency = 1 })
-        Tween(CR, out, { TextTransparency = 1 })
-        Tween(StL, out, { Transparency = 1 })
-        Tween(StR, out, { Transparency = 1 })
-        Tween(Title, out, { TextTransparency = 1 })
-        Tween(Iris, out, { BackgroundTransparency = 1 })
-        Tween(IrisStroke, out, { Transparency = 1 })
-        Tween(Pupil, out, { BackgroundTransparency = 1 })
-        Tween(BarTrack, out, { BackgroundTransparency = 1 })
-        Tween(BarFill, out, { BackgroundTransparency = 1 })
-        Tween(RootScale, out, { Scale = scale * 1.08 })
-        task.wait(0.42)
+        return loadstring(code)()
+    end)
+    if ok and type(fn) == "function" then
+        IntroPlayer = fn
+        return true
     end
+    warn("[CyberVibe] Không nạp được intro: " .. tostring(fn))
+    return false
+end
 
-    pcall(Run)
-    if gui.Parent then gui:Destroy() end
+local function PlayIntro(title, subtitle)
+    if not IntroPlayer then return end
+    local ok, err = pcall(IntroPlayer, {
+        New = New, Corner = Corner, Stroke = Stroke, Tween = Tween,
+        ParentGui = ParentGui, GetViewport = GetViewport,
+        Colors = {
+            ACCENT = ACCENT, BG_CONTROL = BG_CONTROL, BG_OFF = BG_OFF,
+            TEXT_MAIN = TEXT_MAIN, TEXT_DIM = TEXT_DIM, WHITE = WHITE,
+        },
+        Title = title, Subtitle = subtitle, SkipText = L("intro_skip"),
+    })
+    if not ok then warn("[CyberVibe] Intro: " .. tostring(err)) end
 end
 
 function Library:Notify(config)
@@ -2384,10 +2237,10 @@ function Library:CreateWindow(config)
 
     ParentGui(ScreenGui)
     task.wait(0.1)
-    if Settings.Intro and not introPlayed then
+    if Settings.Intro and IntroPlayer and not introPlayed then
         introPlayed = true
         task.spawn(function()
-            PlayIntro()
+            PlayIntro(string.upper(AuthorName), HubName)
             if not destroyed then OpenMenu() end
         end)
     else
