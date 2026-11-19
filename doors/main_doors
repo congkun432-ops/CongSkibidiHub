@@ -844,6 +844,78 @@ WrapTab = function(Tab, TabName)
     Wrap("AddSlider", 4, 5)
     Wrap("AddTextBox", 2, 3)
 
+    -- Multi dropdown: lưu danh sách mục đã chọn vào SettingsData và khôi phục lần sau
+    local OrigMulti = Tab.AddMultiDropdown
+    if type(OrigMulti) == "function" then
+        Tab.AddMultiDropdown = function(self, ...)
+            local Args = table.pack(...)
+            local Key = TabName .. "/" .. tostring(Args[1])
+            Args[1] = I18N.Tr(Args[1])
+
+            local Map, Rev, Opts = {}, {}, {}
+            local function AddOpt(O)
+                if Map[O] then return end
+                local Shown = I18N.Tr(O)
+                Opts[#Opts + 1] = Shown
+                Map[Shown] = O
+                Map[O] = O
+                Rev[O] = Shown
+            end
+            if type(Args[2]) == "table" then
+                for _, O in ipairs(Args[2]) do AddOpt(O) end
+            end
+
+            local function ToRaw(List)
+                local Out = {}
+                for _, V in ipairs(List or {}) do Out[#Out + 1] = Map[V] or V end
+                return Out
+            end
+            local function ToShown(List)
+                local Out = {}
+                for _, V in ipairs(List or {}) do Out[#Out + 1] = Rev[V] or V end
+                return Out
+            end
+
+            local Cb = Args[3]
+            local Saved = nil
+            if SettingsData.Enabled then Saved = SettingsData.Values[Key] end
+            if type(Saved) ~= "table" then Saved = nil end
+            local Initial = Saved or (type(Args[5]) == "table" and Args[5]) or {}
+            -- giữ cả những mục đã lưu nhưng chưa có trong danh sách (vd. item phát hiện ở lần chơi trước)
+            for _, N in ipairs(Initial) do
+                if type(N) == "string" then AddOpt(N) end
+            end
+            SettingsData.Values[Key] = ToRaw(ToShown(Initial))
+
+            Args[2] = Opts
+            Args[5] = ToShown(Initial)
+            Args.n = math.max(Args.n, 5)
+            Args[3] = function(List, Changed, State)
+                local Raw = ToRaw(List)
+                SettingsData.Values[Key] = Raw
+                if SettingsData.Enabled then SaveSettings() end
+                if type(Cb) == "function" then
+                    return Cb(Raw, Changed ~= nil and (Map[Changed] or Changed) or nil, State)
+                end
+            end
+            if Saved and type(Cb) == "function" then
+                local SavedRaw = ToRaw(ToShown(Saved))
+                table.insert(PendingApply, function() Cb(SavedRaw) end)
+            end
+
+            local Obj = OrigMulti(self, table.unpack(Args, 1, Args.n))
+            if type(Obj) == "table" then
+                -- thêm 1 lựa chọn mới vào danh sách đang có (giữ nguyên các mục đang chọn)
+                function Obj.AddOption(_, Raw)
+                    if type(Raw) ~= "string" or Map[Raw] then return end
+                    AddOpt(Raw)
+                    pcall(function() Obj:Refresh(table.clone(Opts), true) end)
+                end
+            end
+            return Obj
+        end
+    end
+
     local OrigSection = Tab.AddSection
     if type(OrigSection) == "function" then
         Tab.AddSection = function(self, ...)
@@ -909,6 +981,9 @@ State = {
 SpeedBoost = false,
 SpeedValue = 16,
 InfiniteJumps = false, EnableCharacterJump = false,
+InfiniteItems = false,
+InfiniteItemsList = { Lockpick = false, SkeletonKey = false, Shears = false, Multitool = false },
+InstantItems = {},
 InstantPrompts = false,
 AutoInteract = false,
 AutoCloset = false,
@@ -1249,6 +1324,97 @@ SecInteract:AddSwitch("Mở cửa từ xa", false, function(S)
     end
 end)
 
+-- ===== Tương tác nhanh theo vật phẩm =====
+local InstantItemExtras = {
+    { "Key", "Chìa khoá" }, { "KeyBackdoor", "Chìa khoá Backdoor" }, { "KeyElectrical", "Chìa khoá điện" },
+    { "KeyIron", "Chìa khoá sắt" }, { "GeneratorFuse", "Cầu chì máy phát" }, { "LiveHintBook", "Sách thư viện" }, { "LeverForGate", "Cần gạt" },
+}
+local InstantItemKnown = {}
+local function ItemLabel(Name, Alias) return Alias .. " [" .. Name .. "]" end
+local function LabelToItem(Label) return string.match(Label, "%[(.-)%]$") or Label end
+Functions.LabelToItem = LabelToItem
+
+local InstantItemOptions = {}
+local InstantItemLabels = {}
+-- vật phẩm luôn tương tác nhanh theo mặc định (người dùng vẫn bỏ chọn được; cài đặt đã lưu sẽ ưu tiên hơn)
+local InstantItemDefaultCodes = {
+    "FuseObtain", "GeneratorFuse", "LiveHintBook", "Crucifix", "Bandage", "Battery", "LiveBreakerPolePickup", "LeverForGate",
+}
+do
+    local Names = {}
+    for Name in pairs(ItemNames) do table.insert(Names, Name) end
+    table.sort(Names)
+    for _, Name in ipairs(Names) do
+        InstantItemKnown[Name] = true
+        InstantItemLabels[Name] = ItemLabel(Name, ItemNames[Name])
+        table.insert(InstantItemOptions, InstantItemLabels[Name])
+    end
+    for _, E in ipairs(InstantItemExtras) do
+        if not InstantItemKnown[E[1]] then
+            InstantItemKnown[E[1]] = true
+            InstantItemLabels[E[1]] = ItemLabel(E[1], E[2])
+            table.insert(InstantItemOptions, InstantItemLabels[E[1]])
+        end
+    end
+end
+local InstantItemDefaults = {}
+for _, Code in ipairs(InstantItemDefaultCodes) do
+    if InstantItemLabels[Code] then
+        table.insert(InstantItemDefaults, InstantItemLabels[Code])
+        State.InstantItems[Code] = true
+    end
+end
+
+-- prompt nhặt vật phẩm -> tên item (nil nếu không phải item)
+function Functions.GetPromptItemName(Prompt)
+    local P = Prompt and Prompt.Parent
+    if not P then return nil end
+    if Prompt.Name == "ModulePrompt" then return P.Name end
+    if InstantItemKnown[P.Name] then return P.Name end
+    return nil
+end
+
+function Functions.ApplyInstantItems()
+    for _, Prompt in Objects.Prompts do
+        if Prompt and Prompt.Parent then
+            local N = Functions.GetPromptItemName(Prompt)
+            if N then
+                local Old = Prompt:GetAttribute("HoldDuration_Old")
+                if Old == nil then
+                    Old = Prompt.HoldDuration
+                    Prompt:SetAttribute("HoldDuration_Old", Old)
+                end
+                Prompt.HoldDuration = (State.InstantPrompts or State.InstantItems[N]) and 0 or Old
+            end
+        end
+    end
+end
+
+-- item mới gặp trong game (chưa có trong danh sách) sẽ tự được thêm vào dropdown
+function Functions.RegisterInstantItem(Name)
+    if InstantItemKnown[Name] then return end
+    InstantItemKnown[Name] = true
+    local DD = Functions.InstantItemDropdown
+    if DD and DD.AddOption then DD:AddOption(Name) end
+end
+
+Functions.InstantItemDropdown = SecInteract:AddMultiDropdown("Tương tác nhanh theo vật phẩm", InstantItemOptions, function(List)
+    local New = {}
+    for _, Label in ipairs(List) do New[LabelToItem(Label)] = true end
+    State.InstantItems = New
+    Functions.ApplyInstantItems()
+end, nil, InstantItemDefaults)
+
+SecInteract:AddButton("Chọn tất cả vật phẩm", "Chọn", function()
+    local DD = Functions.InstantItemDropdown
+    if DD then DD:SelectAll() end
+end)
+
+SecInteract:AddButton("Bỏ chọn tất cả vật phẩm", "Bỏ", function()
+    local DD = Functions.InstantItemDropdown
+    if DD then DD:Clear() end
+end)
+
 Tabs.General:AddSwitch("Lưu cài đặt", false, function(S)
     SettingsData.Enabled = S
     SaveSettings()
@@ -1272,6 +1438,7 @@ SecInteract:AddSwitch("Tương tác nhanh", false, function(S)
             Prompt.HoldDuration = S and 0 or Old
         end
     end
+    Functions.ApplyInstantItems()
     Functions.Notify("Prompt tức thì", S and "Đã bật" or "Đã tắt")
 end)
 
@@ -1314,6 +1481,30 @@ end)
 local SecCh1 = MakeSection(Tabs.Exploits, "Doors Chapter 1", true)
 local SecCh2 = MakeSection(Tabs.Exploits, "Doors Chapter 2", false)
 local SecFun = MakeSection(Tabs.Exploits, "Doors giải trí", false)
+
+do
+    local SecInf = MakeSection(Tabs.General, "Vật phẩm vô hạn", false)
+    SecInf:AddSwitch("Vật phẩm vô hạn", false, function(S)
+        if S and typeof(fireproximityprompt) ~= "function" then
+            Functions.NotifyError("Vật phẩm vô hạn", "Executor không hỗ trợ fireproximityprompt")
+            State.InfiniteItems = false
+            return
+        end
+        State.InfiniteItems = S
+    end)
+    local InfOptions = {
+        "Cậy cửa [Lockpick]", "Chìa khoá xương [SkeletonKey]", "Kéo [Shears]", "Đa dụng [Multitool]",
+    }
+    local InfDD = SecInf:AddMultiDropdown("Chọn vật phẩm vô hạn", InfOptions, function(List)
+        for K in pairs(State.InfiniteItemsList) do State.InfiniteItemsList[K] = false end
+        for _, Label in ipairs(List) do
+            State.InfiniteItemsList[Functions.LabelToItem(Label)] = true
+        end
+    end)
+    SecInf:AddButton("Chọn tất cả vật phẩm vô hạn", "Chọn", function()
+        if InfDD then InfDD:SelectAll() end
+    end)
+end
 
 SecCh2:AddSwitch("Anti Giggle", false, function(S)
     State.BypassGiggle = S
@@ -2692,7 +2883,9 @@ elseif Name == "Padlock" then
         if Object:GetAttribute("HoldDuration_Old") == nil then
             Object:SetAttribute("HoldDuration_Old", Object.HoldDuration)
         end
-        if State.InstantPrompts then
+        local ItemName = Functions.GetPromptItemName(Object)
+        if ItemName then Functions.RegisterInstantItem(ItemName) end
+        if State.InstantPrompts or (ItemName and State.InstantItems[ItemName]) then
             Object.HoldDuration = 0
         end
         if Object:GetAttribute("MaxActivationDistance_Old") == nil then
@@ -2789,8 +2982,36 @@ Connections.FakePromptHandler = ProximityPromptService.PromptTriggered:Connect(f
         and not Functions.HasItem("Lockpick", true) and not Functions.HasItem("Multitool", true) then return end
     if Functions.HasItem("Shears", true) and IsLockPrompt and PName ~= "CuttableVines" and PName ~= "Chest_Vine" and PName ~= "Cellar" then return end
 
-    local RealPrompt = FakePrompts[Object]
-    Functions.FirePrompt(RealPrompt)
+    local ToolNames = { "Lockpick","Shears","SkeletonKey","Key","GeneratorFuse","KeyElectrical","KeyBackdoor","KeyIron", "Multitool" }
+    local AnimateToolNames = { "Lockpick","Shears","SkeletonKey","Key","KeyElectrical","KeyBackdoor","KeyIron", "Multitool" }
+    local Tool
+    for _, N in ToolNames do Tool = Character:FindFirstChild(N) if Tool then break end end
+
+    if Tool and table.find(AnimateToolNames, Tool.Name) and Globals.UseAnimation and Globals.UseAnimationBreak then
+        Globals.UseAnimation:Stop()
+        Globals.UseAnimationBreak:Stop()
+        Globals.UseAnimationBreak:Play()
+        if Tool.Name == "Shears" then Tool:WaitForChild("Handle"):WaitForChild("sound_prompt"):Play() end
+    end
+
+    local Drops = Workspace:FindFirstChild("Drops")
+    local AnyTool = Character:FindFirstChildOfClass("Tool")
+    local ToolData = AnyTool and ItemNames[AnyTool.Name]
+    if Drops and AnyTool and ToolData and State.InfiniteItems and State.InfiniteItemsList[AnyTool.Name] then
+        Drops.ChildAdded:Once(function(NewTool)
+            local Prompt = NewTool:FindFirstChild("ModulePrompt")
+            local RealPrompt = FakePrompts[Object]
+            Functions.FirePrompt(Prompt)
+            Functions.FirePrompt(RealPrompt)
+        end)
+        Character.ChildAdded:Once(function(NewTool)
+            if NewTool.Name == "Shears" then NewTool:WaitForChild("Handle"):WaitForChild("sound_promptend"):Play() end
+        end)
+        RemotesFolder.DropItem:FireServer(AnyTool)
+    else
+        local RealPrompt = FakePrompts[Object]
+        Functions.FirePrompt(RealPrompt)
+    end
 end)
 
 Connections.EntityHandler = Workspace.ChildAdded:Connect(function(Entity)
