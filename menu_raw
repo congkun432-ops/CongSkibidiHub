@@ -111,7 +111,7 @@ local STRINGS = {
         sec_border = "MENU BORDER", rainbow = "Rainbow",
         sec_bg = "MENU BACKGROUND", tile_icon = "Mini menu", tile_plain = "Plain",
         id_ph = "Image ID + Enter", bg_title = "Background", bg_invalid = "Invalid image ID",
-        sec_info = "INFO", intro_skip = "Tap to skip",
+        sec_info = "INFO", intro_s1 = "Setting up...", intro_s2 = "Connecting to server...", intro_s3 = "Downloading data...", intro_s4 = "Verifying...", intro_s5 = "Building interface...", intro_s6 = "Ready!",
         f_userid = "User ID", f_age = "Account age", f_plan = "Plan", f_team = "Team",
         f_hp = "Health", f_speed = "Walk speed", f_jump = "Jump power", f_pos = "Position",
         f_ping = "Ping", f_fps = "FPS",
@@ -139,7 +139,7 @@ local STRINGS = {
         sec_border = "VIỀN MENU", rainbow = "Cầu vồng",
         sec_bg = "NỀN MENU", tile_icon = "Menu nhỏ", tile_plain = "Trơn",
         id_ph = "ID ảnh + Enter", bg_title = "Hình nền", bg_invalid = "ID ảnh không hợp lệ",
-        sec_info = "THÔNG TIN", intro_skip = "Chạm để bỏ qua",
+        sec_info = "THÔNG TIN", intro_s1 = "Đang thiết lập...", intro_s2 = "Đang kết nối máy chủ...", intro_s3 = "Đang tải dữ liệu...", intro_s4 = "Đang xác thực...", intro_s5 = "Đang khởi tạo giao diện...", intro_s6 = "Hoàn tất!",
         f_userid = "User ID", f_age = "Tuổi tài khoản", f_plan = "Gói", f_team = "Đội",
         f_hp = "Máu", f_speed = "Tốc độ chạy", f_jump = "Sức nhảy", f_pos = "Vị trí",
         f_ping = "Ping", f_fps = "FPS",
@@ -351,7 +351,8 @@ local function PlayIntro(title, subtitle)
             ACCENT = ACCENT, BG_CONTROL = BG_CONTROL, BG_OFF = BG_OFF,
             TEXT_MAIN = TEXT_MAIN, TEXT_DIM = TEXT_DIM, WHITE = WHITE,
         },
-        Title = title, Subtitle = subtitle, SkipText = L("intro_skip"),
+        Title = title, Subtitle = subtitle,
+        Steps = { L("intro_s1"), L("intro_s2"), L("intro_s3"), L("intro_s4"), L("intro_s5"), L("intro_s6") },
     })
     if not ok then warn("[CyberVibe] Intro: " .. tostring(err)) end
 end
@@ -588,6 +589,12 @@ function Library:CreateWindow(config)
     local AuthorName = config.AuthorName or "Courier cat"
     local ToggleKey  = config.ToggleKey
     if ToggleKey == nil then ToggleKey = Enum.KeyCode.RightShift end
+
+    if Settings.Intro and not introPlayed then
+        introPlayed = true
+        if not IntroPlayer then Library:LoadIntro(INTRO_URL) end
+        PlayIntro(string.upper(AuthorName), HubName)
+    end
 
     windowSlot = windowSlot + 1
     local slot = windowSlot
@@ -2200,16 +2207,7 @@ function Library:CreateWindow(config)
 
     ParentGui(ScreenGui)
     task.wait(0.1)
-    if Settings.Intro and not introPlayed then
-        introPlayed = true
-        task.spawn(function()
-            if not IntroPlayer then Library:LoadIntro(INTRO_URL) end
-            PlayIntro(string.upper(AuthorName), HubName)
-            if not destroyed then OpenMenu() end
-        end)
-    else
-        OpenMenu()
-    end
+    OpenMenu()
 
     local Window = { Pages = {}, TabButtons = {}, Flags = {} }
 
