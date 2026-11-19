@@ -1,15 +1,3 @@
---[[
-    CyberVibe_Intro.luau  —  Animation mở đầu (module riêng)
-
-    Cách dùng (trong script chính):
-        local Library = loadstring(...)()           -- thư viện CyberVibe
-        Library:SetIntro(loadstring(readfile("CyberVibe_Intro.luau"))())
-        -- hoặc: Library:LoadIntro("CyberVibe_Intro.luau")  /  Library:LoadIntro("https://.../CyberVibe_Intro.luau")
-
-    Module trả về 1 hàm nhận `ctx` (do thư viện truyền vào) và CHẠY ĐẾN KHI INTRO KẾT THÚC.
-    Chỉnh nhanh ở khối CONFIG bên dưới.
-]]
-
 return function(ctx)
     local New, Corner, Stroke, Tween = ctx.New, ctx.Corner, ctx.Stroke, ctx.Tween
     local Col = ctx.Colors
@@ -21,18 +9,16 @@ return function(ctx)
     local Lighting    = game:GetService("Lighting")
     local TweenService = game:GetService("TweenService")
 
-    -- ===================== CONFIG =====================
     local PURPLE     = Color3.fromRGB(150, 90, 255)
-    local EYE_GAP    = 50      -- khoảng cách 2 chữ C so với tâm
-    local EYE_Y      = 56      -- độ cao con mắt
+    local EYE_GAP    = 50
+    local EYE_Y      = 56
     local LOGO_Y     = 60
-    local BAR_TIME   = 2.8     -- thời gian thanh tiến trình
-    local BLUR_SIZE  = 18      -- độ mờ nền game (0 = tắt)
-    local PARTICLES  = 18      -- số hạt sáng bay vào tâm (0 = tắt)
+    local BAR_TIME   = 2.8
+    local BLUR_SIZE  = 18
+    local PARTICLES  = 18
     local TITLE      = ctx.Title or "COURIER CAT"
     local SUBTITLE   = ctx.Subtitle
     local SKIP_TEXT  = ctx.SkipText or "Tap to skip"
-    -- ==================================================
 
     local Q, S, B, QD = Enum.EasingStyle.Quint, Enum.EasingStyle.Sine, Enum.EasingStyle.Back, Enum.EasingStyle.Quad
     local OUT, IN, INOUT = Enum.EasingDirection.Out, Enum.EasingDirection.In, Enum.EasingDirection.InOut
@@ -54,7 +40,6 @@ return function(ctx)
     })
     ctx.ParentGui(gui)
 
-    -- Làm mờ nền game (không bắt buộc)
     local blur
     if BLUR_SIZE > 0 then
         pcall(function()
@@ -73,7 +58,7 @@ return function(ctx)
     end
 
     local function Run()
-        -- ===================== DỰNG GIAO DIỆN =====================
+
         local Dim = New("TextButton", {
             Size = UDim2.fromScale(1, 1),
             BackgroundColor3 = Color3.fromRGB(6, 7, 11),
@@ -119,14 +104,12 @@ return function(ctx)
             return f
         end
 
-        -- Hào quang mềm phía sau (3 lớp chồng nhau)
         local glowTargets = {
             { Circle(0, ACCENT, 1, 2), 200, 0.95 },
             { Circle(0, ACCENT, 1, 2), 140, 0.90 },
             { Circle(0, PURPLE, 1, 2), 90,  0.86 },
         }
 
-        -- Vòng quay (đuôi sao chổi) quanh con mắt
         local Ring = Circle(0, WHITE, 1, 3)
         Ring.BackgroundTransparency = 1
         local RingStroke = Stroke(Ring, WHITE, 2, 1)
@@ -140,7 +123,6 @@ return function(ctx)
             })
         }, RingStroke)
 
-        -- Sóng xung kích khi 2 chữ C ghép lại
         local Shock = Circle(20, WHITE, 1, 3)
         local ShockStroke = Stroke(Shock, ACCENT, 3, 1)
 
@@ -168,7 +150,6 @@ return function(ctx)
         local CL, GradL, StL = MakeC(-EYE_GAP - 150, 0)
         local CR, GradR, StR = MakeC(EYE_GAP + 150, 180)
 
-        -- Con mắt
         local Iris = Circle(0, BG_CONTROL, 0, 5)
         Iris.ClipsDescendants = true
         local IrisStroke = Stroke(Iris, ACCENT, 2, 1)
@@ -188,7 +169,6 @@ return function(ctx)
         }, Pupil)
         Corner(Spark, UDim.new(1, 0))
 
-        -- Tiêu đề: từng chữ hiện lên lần lượt
         local TitleRow = New("Frame", {
             AnchorPoint = Vector2.new(0.5, 0),
             Position = UDim2.new(0.5, 0, 0, 142),
@@ -251,7 +231,6 @@ return function(ctx)
             }, Root)
         end
 
-        -- Thanh tiến trình + phần trăm
         local BarTrack = New("Frame", {
             AnchorPoint = Vector2.new(0.5, 0),
             Position = UDim2.new(0.5, 0, 0, 194),
@@ -295,7 +274,6 @@ return function(ctx)
             Pct.Text = string.format("%d%%", math.floor(BarFill.Size.X.Scale * 100 + 0.5))
         end))
 
-        -- ===================== TIỆN ÍCH =====================
         local function Step(t)
             local e = 0
             while e < t and not skipped do
@@ -329,9 +307,8 @@ return function(ctx)
             end
         end
 
-        -- ===================== KỊCH BẢN =====================
         local function Intro()
-            -- 1) Nền, mờ, thanh tiến trình, hạt sáng
+
             Tween(Dim, TI(0.5, S), { BackgroundTransparency = 0.25 })
             Tween(RootScale, TI(1.4), { Scale = scale })
             Tween(Hint, TI(0.9, S), { TextTransparency = 0.55 })
@@ -346,7 +323,6 @@ return function(ctx)
             SpawnParticles()
             if not Step(0.15) then return end
 
-            -- 2) Hai chữ C trượt vào
             local slide = TI(1.0, Q, OUT)
             Tween(CL, slide, { Position = UDim2.new(0.5, -EYE_GAP, 0, LOGO_Y), TextTransparency = 0 })
             Tween(CR, slide, { Position = UDim2.new(0.5, EYE_GAP, 0, LOGO_Y), TextTransparency = 0 })
@@ -362,7 +338,6 @@ return function(ctx)
             end
             if not Step(0.8) then return end
 
-            -- 3) Va chạm: con mắt bật ra + sóng xung kích + vòng quay
             Tween(Iris, TI(0.6, B, OUT), { Size = UDim2.fromOffset(30, 30) })
             Tween(IrisStroke, TI(0.4, S), { Transparency = 0 })
 
@@ -380,7 +355,6 @@ return function(ctx)
             Tween(RingStroke, TI(0.6, S), { Transparency = 0.1 })
             TweenService:Create(RingGrad, TweenInfo.new(2.2, Enum.EasingStyle.Linear, OUT, -1), { Rotation = 360 }):Play()
 
-            -- 4) Tiêu đề hiện từng chữ
             for i, l in ipairs(letters) do
                 task.delay(0.05 + (i - 1) * 0.045, function()
                     if l.Parent then
@@ -399,19 +373,16 @@ return function(ctx)
             end
             if not Step(0.75) then return end
 
-            -- 5) Mắt nhìn trái -> phải -> giữa
             local look = TI(0.3, S, INOUT)
             Tween(Pupil, look, { Position = UDim2.new(0.5, -6, 0.5, 0) }); if not Step(0.38) then return end
             Tween(Pupil, look, { Position = UDim2.new(0.5, 6, 0.5, 0) });  if not Step(0.45) then return end
             Tween(Pupil, look, { Position = UDim2.fromScale(0.5, 0.5) });  if not Step(0.3) then return end
 
-            -- 6) Chớp mắt
             Tween(Iris, TI(0.08, QD, IN), { Size = UDim2.fromOffset(30, 3) })
             if not Step(0.09) then return end
             Tween(Iris, TI(0.16, B, OUT), { Size = UDim2.fromOffset(30, 30) })
             if not Step(0.3) then return end
 
-            -- Chờ thanh tiến trình chạm 100%
             while BarFill.Size.X.Scale < 0.995 and Step(0.03) do end
             Step(0.12)
         end
@@ -420,7 +391,6 @@ return function(ctx)
             local d = fast and 0.3 or 0.6
             local fade = TI(d, QD, IN)
 
-            -- Con mắt khép lại thành một chấm, rồi mọi thứ tan ra
             Tween(Iris, TweenInfo.new(d, B, IN), { Size = UDim2.fromOffset(0, 0) })
             Tween(IrisStroke, fade, { Transparency = 1 })
             Tween(Ring, fade, { Size = UDim2.fromOffset(0, 0) })
