@@ -111,7 +111,7 @@ local STRINGS = {
         sec_border = "MENU BORDER", rainbow = "Rainbow",
         sec_bg = "MENU BACKGROUND", tile_icon = "Mini menu", tile_plain = "Plain",
         id_ph = "Image ID + Enter", bg_title = "Background", bg_invalid = "Invalid image ID",
-        sec_info = "INFO", intro_s1 = "Setting up...", intro_s2 = "Connecting to server...", intro_s3 = "Downloading data...", intro_s4 = "Verifying...", intro_s5 = "Building interface...", intro_s6 = "Ready!",
+        sec_info = "INFO", md_none = "None", md_count = "%d selected", intro_s1 = "Setting up...", intro_s2 = "Connecting to server...", intro_s3 = "Downloading data...", intro_s4 = "Verifying...", intro_s5 = "Building interface...", intro_s6 = "Ready!",
         f_userid = "User ID", f_age = "Account age", f_plan = "Plan", f_team = "Team",
         f_hp = "Health", f_speed = "Walk speed", f_jump = "Jump power", f_pos = "Position",
         f_ping = "Ping", f_fps = "FPS",
@@ -139,7 +139,7 @@ local STRINGS = {
         sec_border = "VIỀN MENU", rainbow = "Cầu vồng",
         sec_bg = "NỀN MENU", tile_icon = "Menu nhỏ", tile_plain = "Trơn",
         id_ph = "ID ảnh + Enter", bg_title = "Hình nền", bg_invalid = "ID ảnh không hợp lệ",
-        sec_info = "THÔNG TIN", intro_s1 = "Đang thiết lập...", intro_s2 = "Đang kết nối máy chủ...", intro_s3 = "Đang tải dữ liệu...", intro_s4 = "Đang xác thực...", intro_s5 = "Đang khởi tạo giao diện...", intro_s6 = "Hoàn tất!",
+        sec_info = "THÔNG TIN", md_none = "Chưa chọn", md_count = "Đã chọn %d", intro_s1 = "Đang thiết lập...", intro_s2 = "Đang kết nối máy chủ...", intro_s3 = "Đang tải dữ liệu...", intro_s4 = "Đang xác thực...", intro_s5 = "Đang khởi tạo giao diện...", intro_s6 = "Hoàn tất!",
         f_userid = "User ID", f_age = "Tuổi tài khoản", f_plan = "Gói", f_team = "Đội",
         f_hp = "Máu", f_speed = "Tốc độ chạy", f_jump = "Sức nhảy", f_pos = "Vị trí",
         f_ping = "Ping", f_fps = "FPS",
@@ -2637,6 +2637,249 @@ function Library:CreateWindow(config)
                         current = options[1]
                         MainBtn.Text = current ~= nil and tostring(current) or "None"
                     end
+                    Build()
+                end
+                return Register(flag, obj)
+            end
+
+            function Api:AddMultiDropdown(labelText, options, callback, flag, defaults)
+                options = options or {}
+
+                local Row = MakeRow(38, 10)
+                MakeLabel(Row, labelText, 0.4, 10)
+
+                local selected = {}
+
+                local function Key(v) return tostring(v) end
+
+                local function GetList()
+                    local list = {}
+                    for _, opt in ipairs(options) do
+                        if selected[Key(opt)] then table.insert(list, opt) end
+                    end
+                    return list
+                end
+
+                local MainBtn = New("TextButton", {
+                    Size = UDim2.new(0, 130, 0, 28),
+                    Position = UDim2.new(1, -135, 0.5, -14),
+                    BackgroundColor3 = BG_CONTROL,
+                    TextColor3 = ACCENT,
+                    Text = L("md_none"),
+                    Font = Enum.Font.GothamBold,
+                    TextSize = 12,
+                    TextTruncate = Enum.TextTruncate.AtEnd,
+                    AutoButtonColor = false,
+                    ZIndex = 10
+                }, Row)
+                Corner(MainBtn, UDim.new(0, 6))
+                Stroke(MainBtn, STROKE_COL, 1)
+
+                local ListFrame = New("ScrollingFrame", {
+                    Visible = false,
+                    BackgroundColor3 = BG_PANEL,
+                    ScrollBarThickness = 3,
+                    CanvasSize = UDim2.new(0, 0, 0, 0),
+                    AutomaticCanvasSize = Enum.AutomaticSize.Y,
+                    ScrollingDirection = Enum.ScrollingDirection.Y,
+                    Active = true,
+                    ZIndex = 51
+                }, DropLayer)
+                Corner(ListFrame, UDim.new(0, 6))
+                Stroke(ListFrame, ACCENT, 1)
+                New("UIListLayout", { Padding = UDim.new(0, 2), SortOrder = Enum.SortOrder.LayoutOrder }, ListFrame)
+                New("UIPadding", {
+                    PaddingTop = UDim.new(0, 3),
+                    PaddingBottom = UDim.new(0, 3),
+                    PaddingLeft = UDim.new(0, 3),
+                    PaddingRight = UDim.new(0, 3)
+                }, ListFrame)
+
+                local isOpen = false
+                local optionButtons = {}
+
+                local function UpdateText()
+                    local list = GetList()
+                    if #list == 0 then
+                        MainBtn.Text = L("md_none")
+                    elseif #list == 1 then
+                        MainBtn.Text = tostring(list[1])
+                    else
+                        MainBtn.Text = L("md_count", #list)
+                    end
+                end
+
+                local function RefreshVisuals()
+                    for _, entry in ipairs(optionButtons) do
+                        local on = selected[Key(entry.value)] == true
+                        entry.label.TextColor3 = on and ACCENT or Color3.fromRGB(200, 200, 200)
+                        entry.btn.BackgroundTransparency = on and 0.85 or 1
+                        entry.box.BackgroundColor3 = on and ACCENT or BG_CONTROL
+                        entry.tick.Visible = on
+                    end
+                end
+
+                local function Close()
+                    isOpen = false
+                    ListFrame.Visible = false
+                    DropLayer.Visible = false
+                end
+
+                local function Apply(value, state)
+                    local k = Key(value)
+                    if state == nil then state = not selected[k] end
+                    selected[k] = state and true or nil
+                    UpdateText()
+                    RefreshVisuals()
+                    SafeCall(callback, GetList(), value, state and true or false)
+                end
+
+                local function Build()
+                    for _, entry in ipairs(optionButtons) do entry.btn:Destroy() end
+                    table.clear(optionButtons)
+
+                    for i, opt in ipairs(options) do
+                        local OptBtn = New("TextButton", {
+                            Size = UDim2.new(1, 0, 0, 25),
+                            BackgroundColor3 = ACCENT,
+                            BackgroundTransparency = 1,
+                            Text = "",
+                            AutoButtonColor = false,
+                            LayoutOrder = i,
+                            ZIndex = 52
+                        }, ListFrame)
+                        Corner(OptBtn, UDim.new(0, 4))
+
+                        local Box = New("Frame", {
+                            Position = UDim2.new(0, 6, 0.5, -7),
+                            Size = UDim2.new(0, 14, 0, 14),
+                            BackgroundColor3 = BG_CONTROL,
+                            ZIndex = 53
+                        }, OptBtn)
+                        Corner(Box, UDim.new(0, 4))
+                        Stroke(Box, ACCENT, 1)
+
+                        local Tick = New("TextLabel", {
+                            Size = UDim2.new(1, 0, 1, 0),
+                            BackgroundTransparency = 1,
+                            Text = "✓",
+                            TextColor3 = BG_PANEL,
+                            Font = Enum.Font.GothamBold,
+                            TextSize = 11,
+                            Visible = false,
+                            ZIndex = 54
+                        }, Box)
+
+                        local Lbl = New("TextLabel", {
+                            Position = UDim2.new(0, 28, 0, 0),
+                            Size = UDim2.new(1, -32, 1, 0),
+                            BackgroundTransparency = 1,
+                            Text = tostring(opt),
+                            TextColor3 = Color3.fromRGB(200, 200, 200),
+                            Font = Enum.Font.GothamMedium,
+                            TextSize = 11,
+                            TextXAlignment = Enum.TextXAlignment.Left,
+                            TextTruncate = Enum.TextTruncate.AtEnd,
+                            ZIndex = 53
+                        }, OptBtn)
+
+                        OptBtn.MouseButton1Click:Connect(function() Apply(opt) end)
+                        table.insert(optionButtons, { btn = OptBtn, label = Lbl, box = Box, tick = Tick, value = opt })
+                    end
+                    RefreshVisuals()
+                end
+
+                local function Open()
+                    CloseOpenDropdown()
+
+                    local btnPos  = MainBtn.AbsolutePosition - MainFrame.AbsolutePosition
+                    local btnSize = MainBtn.AbsoluteSize
+                    local listH   = math.min(#options * 27 + 6, 130)
+                    if listH < 32 then listH = 32 end
+
+                    local y = btnPos.Y + btnSize.Y + 4
+                    if y + listH > MainFrame.AbsoluteSize.Y - 4 then
+                        y = btnPos.Y - listH - 4
+                    end
+                    y = math.max(y, 4)
+
+                    ListFrame.Position = UDim2.new(0, btnPos.X, 0, y)
+                    ListFrame.Size = UDim2.new(0, btnSize.X, 0, listH)
+                    ListFrame.Visible = true
+                    DropLayer.Visible = true
+                    isOpen = true
+                    openDropdownClose = Close
+                end
+
+                MainBtn.MouseButton1Click:Connect(function()
+                    if isOpen then
+                        CloseOpenDropdown()
+                    else
+                        Open()
+                    end
+                end)
+
+                if defaults ~= nil then
+                    local want = {}
+                    if type(defaults) == "table" then
+                        for _, v in ipairs(defaults) do want[Key(v)] = true end
+                    else
+                        want[Key(defaults)] = true
+                    end
+                    for _, opt in ipairs(options) do
+                        if want[Key(opt)] then selected[Key(opt)] = true end
+                    end
+                end
+                UpdateText()
+                Build()
+
+                local obj = {}
+                function obj:Get() return GetList() end
+                function obj:IsSelected(value) return selected[Key(value)] == true end
+                function obj:Set(value)
+                    local want = {}
+                    if type(value) == "table" then
+                        for _, v in ipairs(value) do want[Key(v)] = true end
+                    elseif value ~= nil then
+                        want[Key(value)] = true
+                    end
+                    table.clear(selected)
+                    for _, opt in ipairs(options) do
+                        if want[Key(opt)] then selected[Key(opt)] = true end
+                    end
+                    UpdateText()
+                    RefreshVisuals()
+                    SafeCall(callback, GetList())
+                end
+                function obj:Toggle(value)
+                    for _, opt in ipairs(options) do
+                        if Key(opt) == Key(value) then
+                            Apply(opt)
+                            return
+                        end
+                    end
+                end
+                function obj:SelectAll()
+                    for _, opt in ipairs(options) do selected[Key(opt)] = true end
+                    UpdateText()
+                    RefreshVisuals()
+                    SafeCall(callback, GetList())
+                end
+                function obj:Clear()
+                    table.clear(selected)
+                    UpdateText()
+                    RefreshVisuals()
+                    SafeCall(callback, GetList())
+                end
+                function obj:Refresh(newOptions, keepCurrent)
+                    CloseOpenDropdown()
+                    options = newOptions or {}
+                    local valid = {}
+                    for _, opt in ipairs(options) do valid[Key(opt)] = true end
+                    for k in pairs(selected) do
+                        if not keepCurrent or not valid[k] then selected[k] = nil end
+                    end
+                    UpdateText()
                     Build()
                 end
                 return Register(flag, obj)
