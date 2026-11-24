@@ -146,7 +146,6 @@ return function(Env)
     end, "collect_types", {})
 
     do
-    local SWITCH_TIMEOUT = 0.6
     local GRIND_BUFFER = "0\001"
     local GrindStations = {
         ["Vật liệu"] = "BlueprintsTable",
@@ -208,50 +207,30 @@ return function(Env)
         end
         table.sort(Indexes)
         for _, Slot in ipairs(Indexes) do
+            -- Bỏ qua ô vũ khí của Kill Aura và ô súng của Kill Gun
+            if Slot == State.AuraSlot or Slot == State.GunSlot then continue end
             local Name = StoredObjectName(Slots[Slot].storedObjects[1])
             if Name then
                 local Category = Collect.Classify(Name)
                 local StationName = Grind.Selected[Category] and GrindStations[Category]
                 local Deposit = StationName and GetDepositPart(StationName)
-                if Deposit then return Slot, Deposit, Name end
-            end
-        end
-        return nil
-    end
-
-    local function GetHeldName()
-        local Character = GetCharacter()
-        if not Character then return nil end
-        for _, Child in ipairs(Character:GetChildren()) do
-            if (Child:IsA("Tool") or Child:IsA("Model")) and ItemData[Child.Name] then
-                return Child.Name
+                if Deposit then return Slot, Deposit end
             end
         end
         return nil
     end
 
     local function RunGrind()
-        local Slot, Deposit, Name = FindGrindJob()
+        local Slot, Deposit = FindGrindJob()
         local _, _, Root = GetCharacter()
         if not (Slot and Root) then return end
         local Remote = GetZapRemote("ZAP_RELIABLE")
         if not Remote then return end
 
-        -- Chỉ đổi ô khi món đang cầm chưa đúng (tránh bấm lại ô đang cầm làm cất đồ)
-        if GetHeldName() ~= Name then
-            if not (Env.Remotes and Env.Remotes.switchSlot) then return end
+        if Env.Remotes and Env.Remotes.switchSlot then
             pcall(function() Env.Remotes.switchSlot.fire(Slot) end)
-            local Waited = 0
-            while Waited < SWITCH_TIMEOUT and GetHeldName() ~= Name do
-                task.wait(0.05)
-                Waited += 0.05
-            end
+            task.wait(0.1)
         end
-
-        -- Đang cầm món khác (vd: cung) thì tuyệt đối không nghiền
-        local Held = GetHeldName()
-        if Held ~= nil and Held ~= Name then return end
-
         pcall(function()
             Remote:FireServer(buffer.fromstring(GRIND_BUFFER), { Deposit })
         end)
@@ -259,70 +238,6 @@ return function(Env)
 
     local function SetGrind(Enabled)
         SetLoop("tự nghiền", Enabled, function() return math.max(0.05, Grind.Delay) end, RunGrind)
-    end
-
-    local function DumpInventory()
-        local function Notify(Type, Content)
-            pcall(function()
-                Window:Notify({ Type = Type, Title = "Túi đồ", Content = Content, Duration = 5 })
-            end)
-        end
-        local Slots = GetInventorySlots()
-        if not Slots then
-            Notify("error", "Không đọc được Inventory.")
-            return
-        end
-        local Lines = {}
-        for Slot, Entry in pairs(Slots) do
-            local Object = type(Entry) == "table" and type(Entry.storedObjects) == "table" and Entry.storedObjects[1]
-            local Parts = {}
-            if type(Object) == "table" then
-                for Key, Value in pairs(Object) do
-                    table.insert(Parts, tostring(Key) .. "=" .. tostring(Value))
-                end
-            end
-            table.insert(Lines, tostring(Slot) .. ": " .. table.concat(Parts, ", "))
-        end
-        table.sort(Lines)
-        for _, Line in ipairs(Lines) do print("[Túi đồ] " .. Line) end
-
-        -- Thông tin chẩn đoán: tìm cách game lưu món đang cầm
-        for Slot, Entry in pairs(Slots) do
-            if type(Entry) == "table" then
-                local Extra = {}
-                for Key, Value in pairs(Entry) do
-                    if Key ~= "storedObjects" then
-                        table.insert(Extra, tostring(Key) .. "=" .. tostring(Value))
-                    end
-                end
-                print("[Túi đồ][ô " .. tostring(Slot) .. "] " .. table.concat(Extra, ", "))
-            end
-        end
-        local Inventory = GetInventory()
-        if Inventory then
-            local Keys = {}
-            for Key, Value in pairs(Inventory) do
-                table.insert(Keys, tostring(Key) .. ":" .. typeof(Value))
-            end
-            table.sort(Keys)
-            print("[Túi đồ][module] " .. table.concat(Keys, ", "))
-        end
-        local Character = GetCharacter()
-        if Character then
-            for _, Child in ipairs(Character:GetChildren()) do
-                local Attrs = {}
-                for Key, Value in pairs(Child:GetAttributes()) do
-                    table.insert(Attrs, tostring(Key) .. "=" .. tostring(Value))
-                end
-                print("[Túi đồ][nhân vật] " .. Child.ClassName .. " " .. Child.Name .. " {" .. table.concat(Attrs, ", ") .. "}")
-            end
-            local Attrs = {}
-            for Key, Value in pairs(Character:GetAttributes()) do
-                table.insert(Attrs, tostring(Key) .. "=" .. tostring(Value))
-            end
-            print("[Túi đồ][thuộc tính nhân vật] " .. table.concat(Attrs, ", "))
-        end
-        Notify("success", "Đã in " .. #Lines .. " ô ra console.")
     end
 
     local GrindSection = FarmTab:AddSection("Tự động nghiền", false)
@@ -335,6 +250,5 @@ return function(Env)
     GrindSection:AddSlider("Tốc độ nghiền", 0.05, 2, Grind.Delay, function(Value)
         Grind.Delay = math.clamp(Value, 0.05, 2)
     end, 2, "grind_delay")
-    GrindSection:AddButton("In túi đồ ra console", "In", DumpInventory)
     end
 end
