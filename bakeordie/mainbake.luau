@@ -10,12 +10,6 @@ local Library = loadstring(game:HttpGet(
     "https://raw.githubusercontent.com/congkun432-ops/CongSkibidiHub/refs/heads/main/menu_raw"
 ))()
 
-local Window = Library:CreateWindow({
-    HubName = "Monster Hub",
-    AuthorName = "Courier cat",
-    ToggleKey = Enum.KeyCode.RightShift,
-})
-
 local BASE_URL = "https://raw.githubusercontent.com/congkun432-ops/CongSkibidiHub/refs/heads/main/bakeordie/"
 local MAIN_FILE = "mainbake.luau"
 local MODULES = { "player", "combat", "collect", "acorn", "chest", "esp", "items", "misc" }
@@ -26,14 +20,10 @@ local Env = {
     UserInputService = UserInputService,
     ReplicatedStorage = ReplicatedStorage,
     LocalPlayer = LocalPlayer,
-    Window = Window,
     MainUrl = BASE_URL .. MAIN_FILE,
 }
 
-local PlayerTab = Window:CreateTab("Người chơi")
-local FarmTab = Window:CreateTab("Cày")
-Env.PlayerTab = PlayerTab
-Env.FarmTab = FarmTab
+local Window
 
 local State = {
     KillAura = false,
@@ -220,10 +210,18 @@ Env.GetInventory = GetInventory
 Env.GetController = GetController
 Env.HubNotify = HubNotify
 
+-- Tải trước toàn bộ module (đứng hình tới khi xong) để menu hiện đủ tab một lần
+local Sources = {}
+for _, Name in ipairs(MODULES) do
+    local Ok, Source = pcall(function() return game:HttpGet(BASE_URL .. Name .. ".luau") end)
+    if Ok and type(Source) == "string" and #Source > 0 then
+        Sources[Name] = Source
+    end
+end
+
 local function LoadModule(Name)
-local Url = BASE_URL .. Name .. ".luau"
-    local Ok, Source = pcall(function() return game:HttpGet(Url) end)
-    if not (Ok and type(Source) == "string" and #Source > 0) then
+    local Source = Sources[Name]
+    if not Source then
         warn("[Monster Hub] không tải được module " .. Name)
         HubNotify("error", "Module", "Không tải được: " .. Name, 8)
         return
@@ -243,6 +241,15 @@ local Url = BASE_URL .. Name .. ".luau"
         HubNotify("error", "Module " .. Name, "Lỗi khi chạy, xem console.", 8)
     end
 end
+
+Window = Library:CreateWindow({
+    HubName = "Monster Hub",
+    AuthorName = "Courier cat",
+    ToggleKey = Enum.KeyCode.RightShift,
+})
+Env.Window = Window
+Env.PlayerTab = Window:CreateTab("Người chơi")
+Env.FarmTab = Window:CreateTab("Cày")
 
 for _, Name in ipairs(MODULES) do
     LoadModule(Name)
