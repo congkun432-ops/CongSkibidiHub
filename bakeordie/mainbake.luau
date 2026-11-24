@@ -1,16 +1,5 @@
 if not game:IsLoaded() then game.Loaded:Wait() end
 
---[[ ============================================================
-    MONSTER HUB - Bake or Die  (VI / EN)
-
-    3 file cùng thư mục bakeordie/ :
-      mainbake.luau : file này - core + player/combat/collect/acorn/chest/items/misc/settings
-      esp.luau      : chỉ ESP
-      lang.luau     : toàn bộ chuỗi giao diện (mỗi dòng = { Tiếng Việt, English })
-
-    Thêm chuỗi mới : thêm 1 dòng vào lang.luau rồi gọi T("key") ở đây
-============================================================ ]]
-
 local Genv = (getgenv and getgenv()) or _G
 if Genv.MonsterHubUnload then pcall(Genv.MonsterHubUnload) end
 
@@ -20,18 +9,12 @@ local UserInputService = game:GetService("UserInputService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local LocalPlayer = Players.LocalPlayer
 
--- ============================================================
--- 1. CONFIG
--- ============================================================
 local LIBRARY_URL = "https://raw.githubusercontent.com/congkun432-ops/CongSkibidiHub/refs/heads/main/menu_raw"
--- URL của CHÍNH file này (dùng cho queue_on_teleport khi đổi server). Upload file này lên đúng link này.
 local BASE_URL = "https://raw.githubusercontent.com/congkun432-ops/CongSkibidiHub/refs/heads/main/bakeordie/"
 local MAIN_URL = BASE_URL .. "mainbake.luau"
 local RESUME_FILE = "MonsterHub_resume.txt"
 
 local Library = loadstring(game:HttpGet(LIBRARY_URL))()
-
--- Tải 1 file phụ, trả về kết quả chunk (nil nếu lỗi)
 local function Fetch(Name)
     local Ok, Result = pcall(function()
         local Chunk, CompileError = loadstring(game:HttpGet(BASE_URL .. Name), "=" .. Name)
@@ -42,9 +25,6 @@ local function Fetch(Name)
     return Ok and Result or nil
 end
 
--- ============================================================
--- 2. TEXT (i18n) - dữ liệu nằm trong lang.luau
--- ============================================================
 local LangData = Fetch("lang.luau")
 if type(LangData) ~= "table" or type(LangData.Text) ~= "table" then
     LangData = { Text = {}, Langs = { "vi", "en" }, Names = { vi = "Tiếng Việt", en = "English" } }
@@ -68,7 +48,6 @@ local function LangIndex()
     return 1
 end
 
--- T("key") hoặc T("key", ...) với string.format
 local function T(Key, ...)
     local Entry = Text[Key]
     local Result = Entry and (Entry[LangIndex()] or Entry[1]) or Key
@@ -289,6 +268,9 @@ local function HubNotify(Type, Title, Content, Duration)
         Window:Notify({ Type = Type, Title = Title, Content = Content, Duration = Duration or 5 })
     end)
 end
+
+-- Hàm dùng chung giữa các module (module collect gán vào đây)
+local Shared = {}
 
 -- Danh sách module: Module("tên", function() ... end), chạy theo thứ tự khai báo
 local ModuleList = {}
@@ -1178,6 +1160,9 @@ Module("collect", function()
     end
 
     local CollectBlacklist = { Skull = true }
+    Shared.Classify = Collect.Classify
+    Shared.ClassifyPickup = ClassifyPickup
+    Shared.Blacklist = CollectBlacklist
 
     function Collect.IsAllowed(Object)
         if CollectBlacklist[Object.Name] then return false end
@@ -2199,66 +2184,220 @@ Module("misc", function()
 end)
 
 -- ------------------------------------------------------------
--- settings (đổi ngôn ngữ)
+-- extras (quay người, nhân vật to, lãnh địa vật phẩm)
 -- ------------------------------------------------------------
-local Teardown, Boot, DestroyWindow, CanDestroyWindow, CaptureLayout
-local Switching = false
-local LangConnection
+Module("extras", function()
+    local ExtrasTab = Window:CreateTab(T("tab.extras"))
 
--- Gọi khi ngôn ngữ đổi (từ nút của hub, hoặc từ menu Cài đặt có sẵn của thư viện)
-local function OnLanguageChanged(Code)
-    if Code == Lang or not Text then return end
-    local Known = false
-    for _, Name in ipairs(LANGS) do
-        if Name == Code then Known = true end
+    -- Quay người ------------------------------------------------
+    local Spin = { Enabled = false, Speed = 360 }
+
+    Track(RunService.Heartbeat:Connect(function(DeltaTime)
+        if not Spin.Enabled then return end
+        local _, Humanoid, Root = GetCharacter()
+        if not Root then return end
+        if Humanoid and Humanoid.AutoRotate then Humanoid.AutoRotate = false end
+        Root.CFrame = Root.CFrame * CFrame.Angles(0, math.rad(Spin.Speed) * DeltaTime, 0)
+    end))
+
+    local function SetSpin(Enabled)
+        Spin.Enabled = Enabled
+        if not Enabled then
+            local _, Humanoid = GetCharacter()
+            if Humanoid then Humanoid.AutoRotate = true end
+        end
     end
-    if not Known then return end
-    Lang = Code
 
-    if Switching then return end
-    if not CanDestroyWindow() then
-        -- Không nhận diện được menu để dựng lại: áp dụng ở lần chạy sau
-        HubNotify("warning", T("lang.notify"), T("lang.reload", LANG_NAMES[Lang]), 8)
-        return
+    -- Nhân vật to (chỉ phía client: người khác vẫn thấy kích thước thường) ----
+    local Giant = { Enabled = false, Scale = 3, Base = nil, Pending = false }
+
+    local function ApplyGiant()
+        local Character = LocalPlayer.Character
+        if not Character then return end
+        local Ok, Current = pcall(Character.GetScale, Character)
+        if not Ok then return end
+        if Giant.Enabled then
+            Giant.Base = Giant.Base or Current
+            pcall(Character.ScaleTo, Character, Giant.Base * Giant.Scale)
+        elseif Giant.Base then
+            pcall(Character.ScaleTo, Character, Giant.Base)
+            Giant.Base = nil
+        end
     end
-    Switching = true
-    task.defer(function()
-        local Layout = CaptureLayout()   -- nhớ vị trí menu trước khi huỷ
-        Teardown()
-        DestroyWindow()
-        Boot(Layout)                     -- dựng lại và trả đúng vị trí cũ
-        HubNotify("success", T("lang.notify"), T("lang.changed", LANG_NAMES[Lang]), 4)
-        task.delay(1.5, function() Switching = false end)
-    end)
-end
 
-Module("settings", function()
-    local SettingsTab = Window:CreateTab(T("tab.settings"))
-    local Other = (Lang == "vi") and "en" or "vi"
-    SettingsTab:AddButton(T("lang.title", LANG_NAMES[Lang]), T("lang.button", LANG_NAMES[Other]), function()
-        -- Thư viện lưu lựa chọn + phát sự kiện; OnLanguageChanged sẽ dựng lại menu
-        pcall(function() Library:SetLanguage(Other) end)
-        if not LangConnection then OnLanguageChanged(Other) end   -- thư viện bản cũ không có sự kiện
+    local function QueueGiant()
+        if Giant.Pending then return end
+        Giant.Pending = true
+        local Gen = Generation
+        task.delay(0.1, function()
+            Giant.Pending = false
+            if Gen == Generation then ApplyGiant() end
+        end)
+    end
+
+    local function SetGiant(Enabled)
+        Giant.Enabled = Enabled
+        ApplyGiant()
+    end
+
+    Track(LocalPlayer.CharacterAdded:Connect(function()
+        Giant.Base = nil
+        if Giant.Enabled then
+            local Gen = Generation
+            task.delay(0.8, function()
+                if Gen == Generation then ApplyGiant() end
+            end)
+        end
+    end))
+
+    -- Lãnh địa: vật phẩm xoay quanh người ----------------------------
+    local Orbit = {
+        Enabled = false, Count = 12, Radius = 10, Speed = 1.5, Height = 2, Reach = 80,
+        Angle = 0, Items = {}, Types = { Material = true, Ingredient = true },
+    }
+    local RING_SIZE = 10
+    local PartOf = setmetatable({}, { __mode = "k" })
+
+    local function IsWanted(Object, Folder)
+        if Object.Parent ~= Folder then return false end
+        if not (Object:IsA("Model") or Object:IsA("BasePart")) then return false end
+        if Object:FindFirstChild("ProductPriceTag") then return false end
+        if Shared.Blacklist and Shared.Blacklist[Object.Name] then return false end
+        return Orbit.Types[Shared.ClassifyPickup(Object)] == true
+    end
+
+    local function ScanOrbit()
+        local _, _, Root = GetCharacter()
+        local Folder = workspace:FindFirstChild("Interactables")
+        if not (Root and Folder and Shared.ClassifyPickup) then return end
+
+        local Kept, Has = {}, {}
+        for _, Object in ipairs(Orbit.Items) do
+            if IsWanted(Object, Folder) and #Kept < Orbit.Count then
+                table.insert(Kept, Object)
+                Has[Object] = true
+            end
+        end
+
+        if #Kept < Orbit.Count then
+            local Candidates = {}
+            for _, Object in ipairs(Folder:GetChildren()) do
+                if not Has[Object] and IsWanted(Object, Folder) then
+                    local Position = GetObjectPosition(Object)
+                    local Distance = Position and (Position - Root.Position).Magnitude
+                    if Distance and Distance <= Orbit.Reach then
+                        table.insert(Candidates, { Object = Object, Distance = Distance })
+                    end
+                end
+            end
+            table.sort(Candidates, function(A, B) return A.Distance < B.Distance end)
+            for _, Candidate in ipairs(Candidates) do
+                if #Kept >= Orbit.Count then break end
+                table.insert(Kept, Candidate.Object)
+            end
+        end
+        Orbit.Items = Kept
+    end
+
+    Every(0.4, function() return Orbit.Enabled end, ScanOrbit)
+
+    Track(RunService.Heartbeat:Connect(function(DeltaTime)
+        if not Orbit.Enabled then return end
+        local _, _, Root = GetCharacter()
+        local Items = Orbit.Items
+        local Total = #Items
+        if not Root or Total == 0 then return end
+
+        Orbit.Angle = (Orbit.Angle + Orbit.Speed * DeltaTime) % (math.pi * 2)
+        local Center = Root.Position
+        for Index, Object in ipairs(Items) do
+            if Object.Parent then
+                local Ring = (Index - 1) // RING_SIZE
+                local Slot = (Index - 1) % RING_SIZE
+                local InRing = math.min(RING_SIZE, Total - Ring * RING_SIZE)
+                local Direction = (Ring % 2 == 0) and 1 or -1
+                local Theta = Orbit.Angle * Direction + Slot * (math.pi * 2 / InRing)
+                local Radius = Orbit.Radius + Ring * 4
+                local Position = Center + Vector3.new(
+                    math.cos(Theta) * Radius,
+                    Orbit.Height + Ring * 1.5,
+                    math.sin(Theta) * Radius
+                )
+                local Target = CFrame.new(Position)
+                if Object:IsA("Model") then
+                    Object:PivotTo(Target)
+                else
+                    Object.CFrame = Target
+                end
+                local Part = PartOf[Object]
+                if not (Part and Part.Parent) then
+                    Part = Object:IsA("BasePart") and Object
+                        or Object.PrimaryPart
+                        or Object:FindFirstChildWhichIsA("BasePart", true)
+                    PartOf[Object] = Part
+                end
+                if Part then
+                    Part.AssemblyLinearVelocity = Vector3.zero
+                    Part.AssemblyAngularVelocity = Vector3.zero
+                end
+            end
+        end
+    end))
+
+    local function SetOrbit(Enabled)
+        Orbit.Enabled = Enabled
+        if not Enabled then Orbit.Items = {} end
+    end
+
+    OnUnload(function()
+        SetSpin(false)
+        SetGiant(false)
+        SetOrbit(false)
     end)
+
+    -- UI
+    local SpinSection = ExtrasTab:AddSection(T("spin.section"), true)
+    SpinSection:AddSwitch(T("spin.enable"), false, SetSpin, "spin_enabled")
+    SpinSection:AddSlider(T("spin.speed"), 30, 1440, Spin.Speed, function(Value)
+        Spin.Speed = math.clamp(Value, 30, 1440)
+    end, 0, "spin_speed")
+
+    local GiantSection = ExtrasTab:AddSection(T("giant.section"), true)
+    GiantSection:AddSwitch(T("giant.enable"), false, SetGiant, "giant_enabled")
+    GiantSection:AddSlider(T("giant.size"), 0.5, 10, Giant.Scale, function(Value)
+        Giant.Scale = math.clamp(Value, 0.5, 10)
+        if Giant.Enabled then QueueGiant() end
+    end, 1, "giant_size")
+
+    local OrbitSection = ExtrasTab:AddSection(T("orbit.section"), true)
+    OrbitSection:AddSwitch(T("orbit.enable"), false, SetOrbit, "orbit_enabled")
+    OrbitSection:AddMultiDropdown(T("orbit.types"), Labels("cat.", COLLECT_CATEGORIES), function(List)
+        Orbit.Types = LabelsToSet("cat.", COLLECT_CATEGORIES, List)
+    end, "orbit_types", { T("cat.Material"), T("cat.Ingredient") })
+    OrbitSection:AddSlider(T("orbit.count"), 1, 60, Orbit.Count, function(Value)
+        Orbit.Count = math.floor(math.clamp(Value, 1, 60))
+    end, 0, "orbit_count")
+    OrbitSection:AddSlider(T("orbit.radius"), 3, 60, Orbit.Radius, function(Value)
+        Orbit.Radius = math.clamp(Value, 3, 60)
+    end, 0, "orbit_radius")
+    OrbitSection:AddSlider(T("orbit.speed"), 0.2, 10, Orbit.Speed, function(Value)
+        Orbit.Speed = math.clamp(Value, 0.2, 10)
+    end, 1, "orbit_speed")
+    OrbitSection:AddSlider(T("orbit.height"), -5, 30, Orbit.Height, function(Value)
+        Orbit.Height = math.clamp(Value, -5, 30)
+    end, 0, "orbit_height")
+    OrbitSection:AddSlider(T("orbit.reach"), 10, 500, Orbit.Reach, function(Value)
+        Orbit.Reach = math.clamp(Value, 10, 500)
+    end, 0, "orbit_reach")
 end)
 
-do
-    local Ok, Connection = pcall(function()
-        if type(Library.OnLanguageChanged) == "function" then
-            return Library:OnLanguageChanged(OnLanguageChanged)
-        end
-    end)
-    if Ok then LangConnection = Connection end
-end
-
 -- ============================================================
--- 5. BOOT
+-- Đổi ngôn ngữ: dịch chữ TẠI CHỖ (không dựng lại menu -> menu không bị lệch/mất)
+-- Ngôn ngữ dùng chung với thư viện CyberVibe (tự lưu CyberVibe_Settings.json)
 -- ============================================================
-local WINDOW_DESTROY_METHODS = { "Destroy", "Unload", "Delete" }
-
--- Theo dõi các ScreenGui do thư viện menu tạo ra (so sánh trước/sau CreateWindow)
--- để tự huỷ sạch menu cũ và giữ nguyên vị trí menu khi dựng lại.
+local LangConnection
 local MenuGuis = {}
+local HookedGuis = {}
 
 local function GetGuiRoots()
     local Roots = {}
@@ -2291,87 +2430,94 @@ local function CollectMenuGuis(Before)
     end
 end
 
-local function Viewport()
-    local Camera = workspace.CurrentCamera
-    return Camera and Camera.ViewportSize or Vector2.new(1920, 1080)
-end
-
--- Khung cửa sổ: Frame cỡ vừa (không phải overlay toàn màn hình), sâu tối đa 3 cấp
-local function WindowKey(Obj, Gui, View)
-    if not (Obj:IsA("Frame") or Obj:IsA("CanvasGroup")) then return nil end
-    local Size = Obj.AbsoluteSize
-    if Size.X < 250 or Size.Y < 150 then return nil end
-    if Size.X > View.X * 0.95 and Size.Y > View.Y * 0.95 then return nil end
-    local Parts, Node = {}, Obj
-    while Node and Node ~= Gui do
-        table.insert(Parts, 1, Node.Name .. ":" .. Node.ClassName)
-        Node = Node.Parent
+-- Bảng tra: chuỗi (mọi ngôn ngữ) -> key
+local Lookup = {}
+for Key, Entry in pairs(Text) do
+    for _, Content in ipairs(Entry) do
+        if Lookup[Content] == nil then Lookup[Content] = Key end
     end
-    if #Parts > 3 then return nil end
-    return Gui.Name .. "|" .. table.concat(Parts, "/")
 end
 
-function CaptureLayout()
-    local Layout, View = {}, Viewport()
+local function ConvertText(Content)
+    if type(Content) ~= "string" or Content == "" then return Content end
+    local Lead, Core, Trail = string.match(Content, "^(%s*)(.-)(%s*)$")
+    local Key = Core ~= "" and Lookup[Core]
+    local Entry = Key and Text[Key]
+    local Target = Entry and Entry[LangIndex()]
+    if Target and Target ~= Core then return Lead .. Target .. Trail end
+    return Content
+end
+
+local function TranslateInstance(Object)
+    pcall(function()
+        if Object:IsA("TextLabel") or Object:IsA("TextButton") then
+            local New = ConvertText(Object.Text)
+            if New ~= Object.Text then Object.Text = New end
+        elseif Object:IsA("TextBox") then
+            local New = ConvertText(Object.PlaceholderText)
+            if New ~= Object.PlaceholderText then Object.PlaceholderText = New end
+        end
+    end)
+end
+
+local function HookGui(Gui)
+    if HookedGuis[Gui] then return end
+    HookedGuis[Gui] = true
+    -- Mục dropdown tạo lại sau này vẫn mang chữ ngôn ngữ cũ -> dịch ngay khi xuất hiện
+    Track(Gui.DescendantAdded:Connect(function(Object)
+        task.defer(TranslateInstance, Object)
+    end))
+end
+
+local function TranslateMenus()
     for _, Gui in ipairs(MenuGuis) do
         if Gui.Parent then
-            for _, Obj in ipairs(Gui:GetDescendants()) do
-                local Key = WindowKey(Obj, Gui, View)
-                if Key then Layout[Key] = Obj.Position end
-            end
-        end
-    end
-    return Layout
-end
-
-local function ApplyLayout(Layout)
-    local View = Viewport()
-    for _, Gui in ipairs(MenuGuis) do
-        if Gui.Parent then
-            for _, Obj in ipairs(Gui:GetDescendants()) do
-                local Key = WindowKey(Obj, Gui, View)
-                if Key then
-                    if Layout[Key] then Obj.Position = Layout[Key] end
-                    -- Chống mất menu: nếu ra khỏi màn hình thì đưa về giữa
-                    local Pos, Size = Obj.AbsolutePosition, Obj.AbsoluteSize
-                    if Pos.X > View.X - 60 or Pos.Y > View.Y - 60 or Pos.X + Size.X < 60 or Pos.Y + Size.Y < 60 then
-                        Obj.AnchorPoint = Vector2.new(0.5, 0.5)
-                        Obj.Position = UDim2.fromScale(0.5, 0.5)
-                    end
-                end
-            end
+            HookGui(Gui)
+            for _, Object in ipairs(Gui:GetDescendants()) do TranslateInstance(Object) end
         end
     end
 end
 
-function CanDestroyWindow()
-    if #MenuGuis > 0 then return true end
-    if not Window then return false end
-    for _, Name in ipairs(WINDOW_DESTROY_METHODS) do
-        local Ok, Method = pcall(function() return Window[Name] end)
-        if Ok and type(Method) == "function" then return true end
-    end
-    return false
+local function ApplyLanguage(Code)
+    Lang = Code
+    pcall(function() Library:SetLanguage(Code) end)   -- lưu lựa chọn + đổi chữ của thư viện
+    TranslateMenus()
+    HubNotify("success", T("lang.notify"), T("lang.changed", LANG_NAMES[Lang]), 4)
 end
 
-function DestroyWindow()
-    if Window then
-        for _, Name in ipairs(WINDOW_DESTROY_METHODS) do
-            local Ok, Method = pcall(function() return Window[Name] end)
-            if Ok and type(Method) == "function" then
-                pcall(Method, Window)
-                break
-            end
+-- Được gọi khi ngôn ngữ đổi từ menu Cài đặt có sẵn của thư viện
+local function OnLanguageChanged(Code)
+    if Code == Lang then return end
+    for _, Name in ipairs(LANGS) do
+        if Name == Code then
+            ApplyLanguage(Code)
+            return
         end
     end
-    -- Huỷ chắc chắn các ScreenGui cũ để không bị chồng/lệch menu
-    for _, Gui in ipairs(MenuGuis) do pcall(function() Gui:Destroy() end) end
-    table.clear(MenuGuis)
-    Window, PlayerTab, FarmTab = nil, nil, nil
 end
 
+Module("settings", function()
+    local SettingsTab = Window:CreateTab(T("tab.settings"))
+    -- Nhãn cố định song ngữ nên không cần dịch
+    SettingsTab:AddButton("Ngôn ngữ / Language", "Tiếng Việt ⇄ English", function()
+        ApplyLanguage(Lang == "vi" and "en" or "vi")
+    end)
+end)
+
+do
+    local Ok, Connection = pcall(function()
+        if type(Library.OnLanguageChanged) == "function" then
+            return Library:OnLanguageChanged(OnLanguageChanged)
+        end
+    end)
+    if Ok then LangConnection = Connection end
+end
+
+-- ============================================================
+-- 5. BOOT
+-- ============================================================
 -- Tắt mọi tính năng, ngắt kết nối, dừng vòng lặp
-function Teardown()
+local function Teardown()
     Generation += 1
     for Name in pairs(Loops) do Loops[Name] = nil end
     for Index = #Unloaders, 1, -1 do pcall(Unloaders[Index]) end
@@ -2381,9 +2527,16 @@ function Teardown()
     ResetState()
 end
 
-function Boot(Layout)
+Genv.MonsterHubUnload = function()
+    if LangConnection then pcall(function() LangConnection:Disconnect() end) end
+    Teardown()
+    if Window then pcall(function() Window:Destroy() end) end
+    for _, Gui in ipairs(MenuGuis) do pcall(function() Gui:Destroy() end) end
+    table.clear(MenuGuis)
+end
+
+do
     local Before = SnapshotGuis()
-    local Gen = Generation
     Window = Library:CreateWindow({
         HubName = "Monster Hub",
         AuthorName = "Courier cat",
@@ -2401,23 +2554,5 @@ function Boot(Layout)
     end
 
     CollectMenuGuis(Before)
-    if Layout then
-        -- Thư viện có thể tự đặt/tween vị trí lúc mở: trả lại vị trí cũ vài lần
-        task.spawn(function()
-            for _, Delay in ipairs({ 0.2, 0.5, 1 }) do
-                task.wait(Delay)
-                if Gen ~= Generation then return end
-                CollectMenuGuis(Before)
-                ApplyLayout(Layout)
-            end
-        end)
-    end
+    TranslateMenus()   -- đồng bộ chữ nếu thư viện/ngôn ngữ lưu khác với chuỗi gốc
 end
-
-Genv.MonsterHubUnload = function()
-    if LangConnection then pcall(function() LangConnection:Disconnect() end) end
-    Teardown()
-    DestroyWindow()
-end
-
-Boot()
