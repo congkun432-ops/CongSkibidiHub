@@ -221,7 +221,7 @@ Env.GetController = GetController
 Env.HubNotify = HubNotify
 
 local function LoadModule(Name)
-    local Url = BASE_URL .. "modules/" .. Name .. ".luau"
+local Url = BASE_URL .. Name .. ".luau"
     local Ok, Source = pcall(function() return game:HttpGet(Url) end)
     if not (Ok and type(Source) == "string" and #Source > 0) then
         warn("[Monster Hub] không tải được module " .. Name)
