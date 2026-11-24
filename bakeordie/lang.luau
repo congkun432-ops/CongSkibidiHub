@@ -1,6 +1,3 @@
---[[ lang.luau : toàn bộ chuỗi giao diện / all UI strings
-    Mỗi dòng: ["key"] = { "Tiếng Việt", "English" }
-    Thêm ngôn ngữ: thêm vào Langs + Names rồi thêm 1 cột vào mỗi dòng. ]]
 
 local Text = {
     -- Tabs
@@ -11,6 +8,7 @@ local Text = {
     ["tab.teleport"] = { "Dịch chuyển", "Teleport" },
     ["tab.misc"]     = { "Khác", "Misc" },
     ["tab.settings"] = { "Cài đặt", "Settings" },
+    ["tab.extras"]   = { "Linh tinh", "Extras" },
 
     -- Player
     ["player.speed"]       = { "Tăng tốc", "Speed boost" },
@@ -40,7 +38,7 @@ local Text = {
 
     -- Collect categories
     ["cat.Ingredient"] = { "Nguyên liệu", "Ingredients" },
-    ["cat.Item"]       = { "Item", "Items" },
+    ["cat.Item"]       = { "Vật phẩm khác", "Other items" },
     ["cat.Material"]   = { "Vật liệu", "Materials" },
     ["cat.Corpse"]     = { "Xác Zombie", "Zombie corpses" },
     ["cat.Medical"]    = { "Đồ y tế", "Medical" },
@@ -119,12 +117,25 @@ local Text = {
     ["code.Display"]   = { "Màn hình", "Screen" },
     ["code.KeyItems"]  = { "Vật phẩm chính", "Key items" },
 
+    -- Extras
+    ["spin.section"]  = { "Quay người", "Spin" },
+    ["spin.enable"]   = { "Bật quay người", "Enable spin" },
+    ["spin.speed"]    = { "Tốc độ quay (độ/giây)", "Spin speed (deg/s)" },
+    ["giant.section"] = { "Nhân vật to (chỉ mình thấy)", "Giant character (only you see it)" },
+    ["giant.enable"]  = { "Bật nhân vật to", "Enable giant" },
+    ["giant.size"]    = { "Kích thước", "Size" },
+    ["orbit.section"] = { "Lãnh địa vật phẩm", "Item territory" },
+    ["orbit.enable"]  = { "Bật lãnh địa", "Enable territory" },
+    ["orbit.types"]   = { "Loại vật phẩm", "Item types" },
+    ["orbit.count"]   = { "Số lượng", "Amount" },
+    ["orbit.radius"]  = { "Bán kính", "Radius" },
+    ["orbit.speed"]   = { "Tốc độ xoay", "Orbit speed" },
+    ["orbit.height"]  = { "Độ cao", "Height" },
+    ["orbit.reach"]   = { "Tầm hút", "Pull reach" },
+
     -- Settings / Language
-    ["lang.title"]    = { "Ngôn ngữ: %s", "Language: %s" },
-    ["lang.button"]   = { "Chuyển sang %s", "Switch to %s" },
     ["lang.notify"]   = { "Ngôn ngữ", "Language" },
     ["lang.changed"]  = { "Đã chuyển sang %s.", "Switched to %s." },
-    ["lang.reload"]   = { "Đã lưu %s. Hãy chạy lại script để áp dụng giao diện.", "Saved %s. Re-run the script to apply the new UI language." },
 
     -- System
     ["sys.module_error"] = { "Lỗi khi chạy, xem console.", "Runtime error, see console." },
