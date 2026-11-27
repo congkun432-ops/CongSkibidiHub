@@ -1,16 +1,22 @@
 local LoadStart = tick()
-local UILibrary = loadstring(game:HttpGet(
-    "https://raw.githubusercontent.com/congkun432-ops/CongSkibidiHub/refs/heads/main/menu_raw"
-))()
-local ESP = loadstring(game:HttpGet(
-    "https://raw.githubusercontent.com/congkun432-ops/CongSkibidiHub/refs/heads/main/doors/esplbri_v2"
-))()
+local function SafeLoad(Url)
+    local Ok, Res = pcall(function() return loadstring(game:HttpGet(Url))() end)
+    if not Ok or Res == nil then
+        warn("[CourierCat] Không tải được: " .. Url .. " | " .. tostring(Res))
+        return nil
+    end
+    return Res
+end
+local UILibrary = SafeLoad("https://raw.githubusercontent.com/congkun432-ops/CongSkibidiHub/refs/heads/main/menu_raw")
+local ESP = SafeLoad("https://raw.githubusercontent.com/congkun432-ops/CongSkibidiHub/refs/heads/main/doors/esplbri_v2")
+if not UILibrary or not ESP then warn("[CourierCat] Dừng script vì thiếu thư viện UI/ESP (mạng hoặc executor không hỗ trợ HttpGet)."); return end
 local CloneRef = cloneref or function(O) return O end
 local Players = CloneRef(game:GetService("Players"))
 local Workspace = CloneRef(workspace)
 local RunService = CloneRef(game:GetService("RunService"))
 local TweenService = CloneRef(game:GetService("TweenService"))
 local UserInputService = CloneRef(game:GetService("UserInputService"))
+local ContextActionService = CloneRef(game:GetService("ContextActionService"))
 local ProximityPromptService = CloneRef(game:GetService("ProximityPromptService"))
 local Lighting = CloneRef(game:GetService("Lighting"))
 local LocalPlayer = Players.LocalPlayer
@@ -31,6 +37,10 @@ local GameData      = game:GetService("ReplicatedStorage"):WaitForChild("GameDat
 local Floor         = GameData:WaitForChild("Floor").Value
 local LiveModifiers = game:GetService("ReplicatedStorage"):FindFirstChild("LiveModifiers") or Instance.new("Folder")
 local LatestRoom     = GameData:WaitForChild("LatestRoom")
+if not RemotesFolder or not CurrentRooms then
+    warn("[CourierCat] Không tìm thấy RemotesFolder/CurrentRooms — có thể không phải trong trận Doors. Dừng script.")
+    return
+end
 
 local FakeEvents = {
     Screech = Instance.new("RemoteEvent"), Shade = Instance.new("RemoteEvent"),
@@ -51,11 +61,12 @@ local JumpscareModules = {}
 local Services = setmetatable({}, { __index = function(_, n) return CloneRef(game:GetService(n)) end })
 
 local Connections, ESPConnections, Functions = {}, {}, {}
+Connections.FloorTracker = GameData.Floor:GetPropertyChangedSignal("Value"):Connect(function() Floor = GameData.Floor.Value end)
 local FakePrompts = {}
 
 local Objects = {
     Prompts = {}, Objectives = {}, Doors = {}, HidingSpots = {},
-    Entities = {}, Items = {}, Chests = {}, Currency = {}, Ladders = {},
+    Entities = {}, Items = {}, Chests = {}, Currency = {}, Ladders = {}, Gold = {},
     Obstructions = {}, EventTriggers = {}, SeekObstructions = {}, SeekHighlights = {},
     EyestalkHighlights = {}, SeekNodes = {}, SeekDuckBoards = {}, SeekBridges = {}, PathLights = {}, Traps = {},
 }
@@ -81,8 +92,10 @@ Globals.RoomsNodesFolder = RoomsNodesFolder
 
 local function GetHiddenUI()
     if gethui then return gethui() end
-    local Folder = Instance.new("Folder", CloneRef(game:GetService("CoreGui")))
+    local Folder = Instance.new("Folder")
     Folder.Name = ("%032x"):format(math.random(0, 2^31 - 1))
+    local Ok = pcall(function() Folder.Parent = CloneRef(game:GetService("CoreGui")) end)
+    if not Ok or not Folder.Parent then Folder.Parent = LocalPlayer:WaitForChild("PlayerGui") end
     return Folder
 end
 local HiddenUI = GetHiddenUI()
@@ -140,7 +153,7 @@ local AllowedNames = {
     ScaryWall=true, BananaPeel=true, Seek_Arm=true, ChandelierObstruction=true, SeekFloodline=true, TriggerEventCollision=true,
     LeverForGate=true, LiveHintBook=true,
     PathLights=true, SeekMovingNewClone=true, RunnerNodes=true, DuckBoard=true, Bridge=true,
-    Padlock=true,
+    Padlock=true, GoldPile=true,
     ElevatorBreaker = true,
         ElevatorCar     = true,
     MinesAnchor     = true,
@@ -165,6 +178,29 @@ function Functions.IsCrouching()
     if Floor == "Fools" or Floor == "OldHotel" then return Character and Character:GetAttribute("Crouching") end
     return CollisionPart.CollisionGroup == "PlayerCrouching"
 end
+-- ===== Anti Rush / Ambush =====
+-- Rush/Ambush chỉ gây sát thương dựa trên vị trí dọc của HumanoidRootPart + trạng thái cúi mà server nhận.
+local AntiRushCfg = {
+    Ramp = 30, Hold = 0.6, MinHip = -3, -- MinHip âm: cho phép hạ sâu hơn mức HipHeight gốc
+    Ranges = { RushMoving = 85, AmbushMoving = 150, GlitchRush = 90, GlitchAmbush = 175, BackdoorRush = 85 },
+}
+
+function Functions.GetNearestRushEntity()
+    for _, Entity in Workspace:GetChildren() do
+        local Range = AntiRushCfg.Ranges[Entity.Name]
+        if Range then
+            local Part = Entity.PrimaryPart or Entity:FindFirstChildWhichIsA("BasePart", true)
+            if Part and LocalPlayer:DistanceFromCharacter(Part.Position) < Range then return Entity end
+        end
+    end
+    return nil
+end
+
+function Functions.IsCrouchForced()
+    local AR = Globals.AntiRush
+    return AR ~= nil and (AR.Drop > 0.1 or AR.Wants == true)
+end
+
 function Functions.HasItem(Name, OnlyChar)
     if not OnlyChar and LocalPlayer.Backpack:FindFirstChild(Name) then return LocalPlayer.Backpack:FindFirstChild(Name) end
     if Character then return Character:FindFirstChild(Name) end
@@ -197,24 +233,18 @@ do
     end
 end
 
-function Functions.Notify(Title, Body, Color)
-    if Globals and Globals.MuteNotify then return end
-    local cfg = {
-        Title    = I18N.Tr(tostring(Title or "Thông báo")),
-        Content  = I18N.Tr(tostring(Body or "")),
-        Duration = 5,
-    }
-    if Color then cfg.Color = Color end
-    local ok = pcall(function() UILibrary:Notify(cfg) end)
-    if not ok then
-        pcall(function() print("[Notify] " .. tostring(Title) .. " — " .. tostring(Body)) end)
-    end
+-- Thông báo dùng hệ thống có sẵn của thư viện UI (UILibrary:Notify), không tạo hệ thống riêng
+function Functions.Notify(Title, Body, Kind)
+    if Globals.MuteNotify then return end
+    pcall(function()
+        UILibrary:Notify({
+            Type = Kind or "info",
+            Title = tostring(Title),
+            Content = tostring(Body),
+            Duration = 5,
+        })
+    end)
 end
-
-function Functions.NotifySuccess(T, B) Functions.Notify(T, B, Color3.fromRGB(0, 255, 130)) end
-function Functions.NotifyError(T, B)   Functions.Notify(T, B, Color3.fromRGB(255, 80, 80))  end
-function Functions.NotifyWarn(T, B)    Functions.Notify(T, B, Color3.fromRGB(255, 180, 0))  end
-function Functions.NotifyInfo(T, B)    Functions.Notify(T, B, Color3.fromRGB(0, 212, 255))  end
 
 function Functions.GetMainGame()
     if Main_Game then return Main_Game end
@@ -268,7 +298,10 @@ function Functions.ResolveModules()
     ModuleRefs.SpiderJumpscare = tryFind("SpiderJumpscare", "SpiderJumpscare_Disabled")
 end
 
-function Functions.GetMinecart() return Camera and Camera:FindFirstChild("MinecartRig") ~= nil end
+function Functions.GetMinecart()
+    local Cam = Workspace.CurrentCamera
+    return Cam ~= nil and Cam:FindFirstChild("MinecartRig") ~= nil
+end
 
 function Functions.CheckCompatability(Features)
     for _, F in ipairs(Features) do
@@ -305,7 +338,7 @@ local DoorReachConnections = {}
 local DoorReachTargets     = {}
 local DoorReachEnabled     = false
 local DoorReachDistance    = 75
-local DoorReachCooldown    = 0.1
+local DoorReachCooldown    = 1.5
 
 local function IsDoorObject(obj)
     if not obj or obj.Name ~= "Door" then return false end
@@ -403,12 +436,12 @@ function Functions.AddESP(Opt, RoomBased)
         if Found then Opt.Object = Found; Obj = Found else return end
     end
     if RoomBased then
-        local CR = tonumber(LocalPlayer:GetAttribute("CurrentRoom"))
+        local CR = tonumber(LocalPlayer:GetAttribute("CurrentRoom")) or 0
         local OR = tonumber(Obj:GetAttribute("ParentRoom"))
         if OR == CR or (table.find(Objects.Doors, Obj) and OR == CR + 1) then ESP:AddESP(Opt) end
         local Conn = LocalPlayer:GetAttributeChangedSignal("CurrentRoom"):Connect(function()
             if ESP.ColorTable[Obj] then Opt.Color = ESP.ColorTable[Obj] end
-            local NR = tonumber(LocalPlayer:GetAttribute("CurrentRoom"))
+            local NR = tonumber(LocalPlayer:GetAttribute("CurrentRoom")) or 0
             local NOR = tonumber(Obj:GetAttribute("ParentRoom"))
             if NOR == NR or (table.find(Objects.Doors, Obj) and NOR == NR + 1) then ESP:AddESP(Opt) else ESP:RemoveESP(Obj) end
         end)
@@ -747,7 +780,7 @@ local function DecryptSettings(Raw)
     return Crypto.chacha20(SettingsCrypto.EncKey, Nonce, Cipher)
 end
 
-local function SaveSettings()
+local function SaveSettingsNow()
     if not SettingsFSReady() then return end
     pcall(function()
         writefile(SettingsFile, EncryptSettings(SettingsHttp:JSONEncode({
@@ -755,6 +788,13 @@ local function SaveSettings()
             Values  = SettingsData.Enabled and SettingsData.Values or {},
         })))
     end)
+end
+
+local SavePending = false
+local function SaveSettings()
+    if SavePending then return end
+    SavePending = true
+    task.delay(0.5, function() SavePending = false; SaveSettingsNow() end)
 end
 
 if SettingsFSReady() then
@@ -774,12 +814,14 @@ if SettingsFSReady() then
             end
         end
         if Migrate then
-            SaveSettings()
+            SaveSettingsNow()
             if typeof(delfile) == "function" then pcall(delfile, LegacyFile) end
         end
     end)
 end
 
+SettingsData.Values["Utility/Xuyên tường"] = nil
+SettingsData.Values["Utility/WidgetState_WallPass"] = nil
 local SectionKeys = { ["Figure"] = "Figure" }
 local WrapTab
 WrapTab = function(Tab, TabName)
@@ -986,10 +1028,9 @@ InfiniteItemsList = { Lockpick = false, SkeletonKey = false, Shears = false, Mul
 InstantItems = {},
 InstantPrompts = false,
 AutoInteract = false,
-AutoCloset = false,
 DoorReach = false,
-DoorReachDistance = 75, DoorReachCooldown = 0.1,
-InteractCooldown = 0.75,
+DoorReachDistance = 75, DoorReachCooldown = 1.5,
+InteractCooldown = 0.10,
 PromptReach = 1,
 
     AutoInteractIgnore = { ["Locks"]=false, ["Glitch Fragments"]=false, ["Dropped Items"]=true, ["Jeff Items"]=false, ["Minecarts"]=false, ["Currency"]=false },
@@ -1009,7 +1050,7 @@ RemoveSurge=false, RemoveFootstepSounds=false, DisableEntityJumpscares=false,
 NoScreechDamage=false, NoHaltDamage=false,
 NoA90Damage=false, NoSurgeDamage=false,
 
-    PositionSpoof=false, CrouchSpoof=false,
+    AntiRush=false, AntiRushDepth=3,
     WallPass=false, WallPassSpeed=2.25,
 
 FigureGodmode = false,
@@ -1023,6 +1064,7 @@ AmbientColor = Color3.fromRGB(255, 255, 255),
 FieldOfView=70,
 ThirdPerson=false, ThirdPersonX=1.5, ThirdPersonY=1, ThirdPersonZ=5, ThirdPersonWallCheck=false,
 FOVEnabled=false, RemoveCutscenes=false, RemoveFog=false, RemoveCameraShake=false, RemoveCameraBobbing=false,
+Freecam=false, FreecamSpeed=50, FreecamSens=1,
 
 ObjectiveESP=false,
 ObjectiveColor = Color3.fromRGB(0, 255, 0),
@@ -1038,6 +1080,8 @@ ItemESP=false,
 ItemColor = Color3.fromRGB(170, 0, 255),
 LadderESP=false,
 LadderColor = Color3.fromRGB(255, 255, 255),
+GoldESP=false,
+GoldColor = Color3.fromRGB(255, 215, 0),
 EntityESP=false,
 EntityColor = Color3.fromRGB(255, 0, 0),
 LeverESP=false,
@@ -1053,7 +1097,7 @@ AutoSteerMinecart=false, ShowSeekPath=false, RemoveSeekTrigger=false,
 AutoRevive=false,
 ShowSeekPathColor = Color3.fromRGB(0, 255, 0),
 ShowEyestalkPath=false, ShowEyestalkPathColor = Color3.fromRGB(0, 120, 255),
-BypassSeekObstructions=false, MinecartTurnDistance=30, MinecartDuckDistance=50,
+BypassSeekObstructions=false, MinecartTurnDistance=30, MinecartDuckDistance=15,
 }
 
 local function MakeSection(Tab, Title, Open)
@@ -1080,7 +1124,7 @@ SecPlayer:AddSwitch("Hiện nút nhảy", false, function(S)
 end)
 
 local Widgets = {}
-local WidgetLock = { Jump = false, ThirdPerson = false, WallPass = false, ESPMute = false }
+local WidgetLock = { Jump = false, ThirdPerson = false, WallPass = false, ESPMute = false, Freecam = false }
 local WidgetRestored = {}
 
 local function RefreshWidget(Id)
@@ -1259,7 +1303,6 @@ Tabs.Misc:AddDropdown("Ngôn ngữ / Language", I18N.Lang == "en" and { "English
     if not Ok then
         Msg = Msg .. (New == "en" and " Re-execute the script to update the menu." or " Chạy lại script để cập nhật menu.")
     end
-    Functions.NotifyInfo("Ngôn ngữ / Language", Msg)
 end)
 
 local SecUtilJump  = MakeSection(Tabs.Utility, "Nút nhảy", true)
@@ -1295,7 +1338,6 @@ end)
 SecUtilWall:AddSwitch("Xuyên tường", false, function(S)
     State.WallPass = S
     Functions.RefreshWallPassWidget()
-    Functions.Notify("Xuyên tường", S and "Đang kéo bạn chậm về phía trước — nhìn hướng muốn đi" or "Đã tắt")
 end)
 
 SecUtilWall:AddSlider("Tốc độ xuyên", 1, 2.8, 2.25, function(v)
@@ -1311,6 +1353,20 @@ end)
 SecUtilWall:AddSwitch("Khoá nút xuyên tường", false, function(S)
     WidgetLock.WallPass = S
 end)
+
+do
+    SettingsData.Values["Utility/WidgetState_Freecam"] = nil
+    local SecUtilFly = MakeSection(Tabs.Utility, "Freecam", false)
+    SecUtilFly:AddSwitch("Nút Freecam", false, function(S)
+        SetWidget("Freecam", S, "Freecam", 176,
+            function() return State.Freecam end,
+            function() Functions.SetFreecam(not State.Freecam) end)
+        if not S and State.Freecam then Functions.SetFreecam(false) end
+    end)
+    SecUtilFly:AddSwitch("Khoá nút Freecam", false, function(S)
+        WidgetLock.Freecam = S
+    end)
+end
 SecPlayer:AddSwitch("Nhảy vô hạn", false, function(S) State.InfiniteJumps = S end)
 
 SecInteract:AddSwitch("Mở cửa từ xa", false, function(S)
@@ -1318,10 +1374,13 @@ SecInteract:AddSwitch("Mở cửa từ xa", false, function(S)
     DoorReachEnabled = S
     if S then
         Functions.ScanAllDoors()
-        Functions.Notify("Door Reach", "Đã bật — bán kính " .. DoorReachDistance .. " studs")
     else
-        Functions.Notify("Door Reach", "Đã tắt")
     end
+end)
+
+SecInteract:AddSlider("Tầm mở cửa", 1, 75, 75, function(V)
+    DoorReachDistance = V
+    State.DoorReachDistance = V
 end)
 
 -- ===== Tương tác nhanh theo vật phẩm =====
@@ -1361,7 +1420,6 @@ local InstantItemDefaults = {}
 for _, Code in ipairs(InstantItemDefaultCodes) do
     if InstantItemLabels[Code] then
         table.insert(InstantItemDefaults, InstantItemLabels[Code])
-        State.InstantItems[Code] = true
     end
 end
 
@@ -1398,32 +1456,14 @@ function Functions.RegisterInstantItem(Name)
     if DD and DD.AddOption then DD:AddOption(Name) end
 end
 
-Functions.InstantItemDropdown = SecInteract:AddMultiDropdown("Tương tác nhanh theo vật phẩm", InstantItemOptions, function(List)
-    local New = {}
-    for _, Label in ipairs(List) do New[LabelToItem(Label)] = true end
-    State.InstantItems = New
-    Functions.ApplyInstantItems()
-end, nil, InstantItemDefaults)
-
-SecInteract:AddButton("Chọn tất cả vật phẩm", "Chọn", function()
-    local DD = Functions.InstantItemDropdown
-    if DD then DD:SelectAll() end
-end)
-
-SecInteract:AddButton("Bỏ chọn tất cả vật phẩm", "Bỏ", function()
-    local DD = Functions.InstantItemDropdown
-    if DD then DD:Clear() end
-end)
-
 Tabs.General:AddSwitch("Lưu cài đặt", false, function(S)
     SettingsData.Enabled = S
     SaveSettings()
-    Functions.Notify("Lưu cài đặt", S and "Đã bật — lần sau tự khôi phục các cài đặt" or "Đã tắt — xoá cài đặt đã lưu")
 end)
 
 SecInteract:AddSwitch("Tự tương tác", false, function(S)
     State.AutoInteract = S
-    if S then Functions.Notify("AutoInteract", "Đã bật tự động tương tác") end
+    if S then  end
 end)
 
 SecInteract:AddSwitch("Tương tác nhanh", false, function(S)
@@ -1439,21 +1479,6 @@ SecInteract:AddSwitch("Tương tác nhanh", false, function(S)
         end
     end
     Functions.ApplyInstantItems()
-    Functions.Notify("Prompt tức thì", S and "Đã bật" or "Đã tắt")
-end)
-
-SecInteract:AddSlider("Tốc độ tương tác", 0.1, 0.75, 0.75, function(V)
-    State.InteractCooldown = V
-end, 2)
-
-SecInteract:AddSlider("Tốc độ mở cửa", 0.1, 0.75, 0.1, function(V)
-    DoorReachCooldown = V
-    State.DoorReachCooldown = V
-end, 2)
-
-SecInteract:AddSlider("Tầm mở cửa", 1, 75, 75, function(V)
-    DoorReachDistance = V
-    State.DoorReachDistance = V
 end)
 
 SecInteract:AddSlider("Tầm tương tác", 1, 2, 1, function(V)
@@ -1466,27 +1491,10 @@ SecInteract:AddSlider("Tầm tương tác", 1, 2, 1, function(V)
     end
 end, 1)
 
-Tabs.General:AddButton("Chơi lại", "Bấm", function()
-    if RemotesFolder and RemotesFolder:FindFirstChild("PlayAgain") then RemotesFolder.PlayAgain:FireServer() end
-end)
-
-Tabs.General:AddButton("Về sảnh", "Bấm", function()
-    if RemotesFolder and RemotesFolder:FindFirstChild("Lobby") then RemotesFolder.Lobby:FireServer() end
-end)
-
-Tabs.General:AddButton("Hồi sinh", "Bấm", function()
-    if RemotesFolder and RemotesFolder:FindFirstChild("Revive") then RemotesFolder.Revive:FireServer() end
-end)
-
-local SecCh1 = MakeSection(Tabs.Exploits, "Doors Chapter 1", true)
-local SecCh2 = MakeSection(Tabs.Exploits, "Doors Chapter 2", false)
-local SecFun = MakeSection(Tabs.Exploits, "Doors giải trí", false)
-
 do
     local SecInf = MakeSection(Tabs.General, "Vật phẩm vô hạn", false)
     SecInf:AddSwitch("Vật phẩm vô hạn", false, function(S)
         if S and typeof(fireproximityprompt) ~= "function" then
-            Functions.NotifyError("Vật phẩm vô hạn", "Executor không hỗ trợ fireproximityprompt")
             State.InfiniteItems = false
             return
         end
@@ -1505,6 +1513,26 @@ do
         if InfDD then InfDD:SelectAll() end
     end)
 end
+
+Tabs.General:AddButton("Chơi lại", "Bấm", function()
+    if RemotesFolder and RemotesFolder:FindFirstChild("PlayAgain") then RemotesFolder.PlayAgain:FireServer() end
+end)
+
+Tabs.General:AddButton("Về sảnh", "Bấm", function()
+    if RemotesFolder and RemotesFolder:FindFirstChild("Lobby") then RemotesFolder.Lobby:FireServer() end
+end)
+
+Tabs.General:AddButton("Hồi sinh", "Bấm", function()
+    if RemotesFolder and RemotesFolder:FindFirstChild("Revive") then RemotesFolder.Revive:FireServer() end
+end)
+
+local SecCh1 = MakeSection(Tabs.Exploits, "Doors Chapter 1", true)
+local SecCh2 = MakeSection(Tabs.Exploits, "Doors Chapter 2", false)
+local SecFun = MakeSection(Tabs.Exploits, "Doors giải trí", false)
+
+SecCh1:AddSwitch("Anti Rush / Ambush", false, function(S)
+    State.AntiRush = S
+end)
 
 SecCh2:AddSwitch("Anti Giggle", false, function(S)
     State.BypassGiggle = S
@@ -1642,6 +1670,42 @@ SecCh1:AddSwitch("Tắt Jumpscare", false, function(S)
     end
 end)
 
+local function SetEntityModules(Pairs, On)
+    pcall(Functions.ResolveModules)
+    for _, Pair in ipairs(Pairs) do
+        local Ref, Base = ModuleRefs[Pair[1]], Pair[2]
+        if Ref and Ref.Parent then Ref.Name = On and (Base .. "_Disabled") or Base end
+    end
+end
+
+SecCh1:AddSwitch("Xoá Screech", false, function(S)
+    State.RemoveScreech = S
+    SetEntityModules({ { "Screech", "Screech" }, { "GlitchScreech", "GlitchScreech" } }, S)
+end)
+
+SecCh1:AddSwitch("Xoá Halt", false, function(S)
+    State.RemoveHalt = S
+    SetEntityModules({ { "Shade", "Shade" } }, S)
+end)
+
+SecCh2:AddSwitch("Xoá Dread", false, function(S)
+    State.RemoveDread = S
+    SetEntityModules({ { "Dread", "Dread" } }, S)
+end)
+
+SecCh2:AddSwitch("Xoá Surge", false, function(S)
+    State.RemoveSurge = S
+    if Globals.SurgeFrame and Globals.SurgeFrame.Parent then
+        Globals.SurgeFrame.Name = S and "SurgeVignette_Disabled" or "SurgeVignette"
+    end
+end)
+
+SecFun:AddSwitch("Xoá A-90", false, function(S)
+    State.RemoveA90 = S
+    SetEntityModules({ { "A90", "A90" } }, S)
+end)
+
+
 local function UpdateBeamVisibility(BeamTable, Visible)
     local Vis = Visible and 0 or 1
     local Seq = NumberSequence.new({ NumberSequenceKeypoint.new(0, Vis), NumberSequenceKeypoint.new(1, Vis) })
@@ -1655,6 +1719,10 @@ end
 local SecSeek   = MakeSection(Tabs.Floors, "Seek", true)
 local SecEye    = MakeSection(Tabs.Floors, "Eyestalk", false)
 local SecFigure = MakeSection(Tabs.Floors, "Figure", false)
+local SecFloorBypass = MakeSection(Tabs.Floors, "Bypass", false)
+SecFloorBypass:AddSwitch("Hồi sinh vô hạn (Fools/OldHotel)", false, function(S)
+    State.AutoRevive = S
+end)
 
 SecSeek:AddSwitch("Đường Seek", false, function(S) State.ShowSeekPath = S; UpdateBeamVisibility(Objects.SeekHighlights, S) end)
 
@@ -1673,10 +1741,6 @@ SecEye:AddDropdown("Màu Eyestalk", { "Xanh biển", "Hồng", "Xanh lá", "Đen
 end)
 
 SecSeek:AddSwitch("Tự lái Minecart", false, function(S) State.AutoSteerMinecart = S end)
-
-SecSeek:AddTextBox("Cự ly rẽ", "30", function(T) State.MinecartTurnDistance = tonumber(T) or 30 end)
-
-SecSeek:AddTextBox("Cự ly cúi", "50", function(T) State.MinecartDuckDistance = tonumber(T) or 50 end)
 
 SecSeek:AddSwitch("Bỏ chướng ngại", false, function(S)
     State.BypassSeekObstructions = S
@@ -1711,16 +1775,10 @@ end)
 
 SecFigure:AddSwitch("Figure Godmode", false, function(S)
     State.FigureGodmode = S
-    Functions.Notify("Figure Godmode", S
-        and "Đã bật — tự đẩy va chạm xuống khi Figure tới gần"
-        or  "Đã tắt")
 end)
 
 SecFigure:AddSwitch("Auto Minigame(beta)", false, function(S)
     State.AutoHeartbeatMinigame = S
-    Functions.Notify("Heartbeat Minigame", S
-        and "Đã bật — sẽ không bao giờ thua khi Figure bắt"
-        or  "Đã tắt")
 end)
 
 SecFigure:AddSwitch("Xoá Figure", false, function(S)
@@ -1737,12 +1795,10 @@ SecFigure:AddSwitch("Xoá Figure", false, function(S)
             end
         end
     end
-    Functions.Notify("Xoá Figure", S and "Đã bật" or "Đã tắt")
 end)
 
 SecFigure:AddSwitch("Tự mở khoá thư viện", false, function(S)
     State.AutoUnlockPadlock = S
-    Functions.Notify("Auto Padlock", S and "Đã bật — tự nhập code khi tới gần ổ khoá" or "Đã tắt")
 end)
 
 SecFigure:AddSlider("Cự ly mở khoá", 1, 50, 10, function(V)
@@ -1758,16 +1814,13 @@ SecFigure:AddSwitch("Tự giải cầu giao", false, function(S)
         local BreakerBox = CurrentRooms:FindFirstChild("ElevatorBreaker", true)
         if BreakerBox then
             if not Globals.BreakerBoxInteracted then
-                Functions.Notify("Breaker Box", "Hãy tương tác với hộp cầu giao — sẽ tự động giải")
                 Globals.BreakerBoxNotified = true
             else
                 pcall(function() RemotesFolder.EBF:FireServer() end)
             end
         else
-            Functions.Notify("Breaker Box", "Bật — sẽ tự giải khi gặp hộp cầu giao")
         end
     else
-        Functions.Notify("Breaker Box", "Đã tắt")
     end
 end)
 
@@ -1783,7 +1836,7 @@ local ESPApplied = {}
 ESPApply.Door = function(S)
     State.DoorESP = S
     for _, O in Objects.Doors do
-        if S then Functions.AddESP({ Object = O, Text = "Cửa " .. Functions.GetDoorNumber(O), Color = State.DoorColor }, true)
+        if S then Functions.AddESP({ Object = O, Text = "Cửa " .. Functions.GetDoorNumber(O), Color = State.DoorColor, Priority = 100 }, true)
         else Functions.RemoveESP(O) end
     end
 end
@@ -1849,6 +1902,14 @@ ESPApply.Hiding = function(S)
     end
 end
 
+ESPApply.Gold = function(S)
+    State.GoldESP = S
+    for _, O in Objects.Gold do
+        if S then Functions.AddESP({ Object = O, Text = "Vàng", Color = State.GoldColor }, true)
+        else Functions.RemoveESP(O) end
+    end
+end
+
 ESPApply.Ladder = function(S)
     State.LadderESP = S
     for _, O in Objects.Ladders do
@@ -1859,9 +1920,10 @@ ESPApply.Ladder = function(S)
     end
 end
 
-local ESPOrder = { "Door", "Entity", "Item", "Player", "Chest", "Hiding", "Ladder" }
+local ESPOrder = { "Door", "Entity", "Item", "Player", "Chest", "Hiding", "Ladder", "Gold" }
 
 local function IsESPMuted(Key)
+    if Globals.FreecamESPOff == true then return true end
     return Globals.ESPMuteOn == true and Globals.ESPMuteSel[Key] == true
 end
 
@@ -1896,17 +1958,24 @@ BindESPSwitch("ESP Người", "Player")
 BindESPSwitch("ESP Rương", "Chest")
 BindESPSwitch("ESP Chỗ trốn", "Hiding")
 BindESPSwitch("ESP Thang", "Ladder")
+BindESPSwitch("ESP Vàng", "Gold")
 
 -- Tiện ích (tab Tiện ích): bật công tắc chính thì tắt các loại ESP đã chọn, tắt công tắc thì bật lại
 -- những ESP mà bạn đã bật từ trước
 local SecUtilESP = MakeSection(Tabs.Utility, "Tắt ESP tạm thời", false)
 local ESPTitles = {
     Door = "ESP Cửa", Entity = "ESP Thực thể", Item = "ESP Vật phẩm", Player = "ESP Người",
-    Chest = "ESP Rương", Hiding = "ESP Chỗ trốn", Ladder = "ESP Thang",
+    Chest = "ESP Rương", Hiding = "ESP Chỗ trốn", Ladder = "ESP Thang", Gold = "ESP Vàng",
 }
 
 local function SetESPMute(On)
     Globals.ESPMuteOn = On and true or false
+    for _, Key in ipairs(ESPOrder) do SyncESP(Key) end
+end
+
+-- Freecam: tạm tắt toàn bộ ESP khi bật, tắt Freecam thì ESP đã bật từ trước tự bật lại
+function Functions.SetFreecamESPOff(On)
+    Globals.FreecamESPOff = On and true or false
     for _, Key in ipairs(ESPOrder) do SyncESP(Key) end
 end
 
@@ -1976,6 +2045,215 @@ Tabs.Visuals:AddSwitch("Cảnh báo thực thể", true, function(S)
     end
 end)
 
+do
+    local Fly = {
+        Active = false, Conns = {}, Touches = {},
+        Yaw = 0, Pitch = 0, Pos = Vector3.zero, Pad = Vector3.zero,
+        Char = nil, Hum = nil, Root = nil, Frozen = nil, Saved = nil,
+        Pinned = false,
+        RMB = false, MouseSet = false, PrevMouse = nil,
+    }
+    Globals.Fly = Fly
+    local StepName = "DoorsFreecam"
+    local MaxPitch = math.rad(89)
+
+    local function Rotate(Dx, Dy, Sens)
+        Sens = Sens * (State.FreecamSens or 1)
+        Fly.Yaw = Fly.Yaw - Dx * Sens
+        Fly.Pitch = math.clamp(Fly.Pitch - Dy * Sens, -MaxPitch, MaxPitch)
+    end
+
+    local function ReadMove(Cam)
+        local V
+        local Ctl = Globals.Controls
+        if Ctl and Globals.OriginalGetMoveVector then
+            local Ok, R = pcall(Globals.OriginalGetMoveVector, Ctl)
+            if Ok and typeof(R) == "Vector3" then V = R end
+        end
+        local Typing = UserInputService:GetFocusedTextBox() ~= nil
+        if not V then
+            V = Vector3.zero
+            if not Typing then
+                local X = (UserInputService:IsKeyDown(Enum.KeyCode.D) and 1 or 0) - (UserInputService:IsKeyDown(Enum.KeyCode.A) and 1 or 0)
+                local Z = (UserInputService:IsKeyDown(Enum.KeyCode.S) and 1 or 0) - (UserInputService:IsKeyDown(Enum.KeyCode.W) and 1 or 0)
+                V = Vector3.new(X, 0, Z)
+            end
+        end
+        local Up = 0
+        if not Typing then
+            if UserInputService:IsKeyDown(Enum.KeyCode.Space) or UserInputService:IsKeyDown(Enum.KeyCode.E) then Up += 1 end
+            if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) or UserInputService:IsKeyDown(Enum.KeyCode.Q) then Up -= 1 end
+        end
+        return V, math.clamp(Up, -1, 1)
+    end
+
+    local function Step(Dt)
+        if not Fly.Active then return end
+        local Cam = Workspace.CurrentCamera
+        local Char, Hum, Root = Fly.Char, Fly.Hum, Fly.Root
+        if not Cam or not Char or Character ~= Char or not Char.Parent or not Hum.Parent or not Root.Parent or Hum.Health <= 0 then
+            task.defer(Functions.SetFreecam, false, true)
+            return
+        end
+
+        if Cam.CameraType ~= Enum.CameraType.Scriptable then Cam.CameraType = Enum.CameraType.Scriptable end
+
+        if Hum.Jump and not Functions.GetMinecart() then Hum.Jump = false end
+        local Local, Up = ReadMove(Cam)
+
+        if Fly.Pad.Magnitude > 0.15 then
+            Fly.Yaw = Fly.Yaw - Fly.Pad.X * Dt * 2.5 * (State.FreecamSens or 1)
+            Fly.Pitch = math.clamp(Fly.Pitch + Fly.Pad.Y * Dt * 2.5 * (State.FreecamSens or 1), -MaxPitch, MaxPitch)
+        end
+
+        local Rot = CFrame.fromOrientation(Fly.Pitch, Fly.Yaw, 0)
+        local World = Rot:VectorToWorldSpace(Vector3.new(Local.X, 0, Local.Z)) + Vector3.new(0, Up, 0)
+        if World.Magnitude > 1 then World = World.Unit end
+        Fly.Pos = Fly.Pos + World * (State.FreecamSpeed or 50) * Dt
+        local CF = CFrame.new(Fly.Pos) * Rot
+        Cam.CFrame = CF
+        Cam.Focus = CF
+    end
+
+    local function Disable(Silent)
+        if not Fly.Active then return end
+        Fly.Active = false
+        State.Freecam = false
+        pcall(Functions.SetFreecamESPOff, false)
+        pcall(function() RunService:UnbindFromRenderStep(StepName) end)
+        for _, C in pairs(Fly.Conns) do pcall(function() C:Disconnect() end) end
+        table.clear(Fly.Conns)
+        table.clear(Fly.Touches)
+        Fly.RMB = false
+        Fly.Pad = Vector3.zero
+        if Fly.MouseSet then
+            Fly.MouseSet = false
+            pcall(function() UserInputService.MouseBehavior = Fly.PrevMouse or Enum.MouseBehavior.Default end)
+        end
+        pcall(function() ContextActionService:UnbindAction("DoorsFreecamSink") end)
+        if Globals.SetMoveGate then Globals.SetMoveGate(false) end
+
+        local Saved = Fly.Saved or {}
+        pcall(function() ProximityPromptService.Enabled = Saved.Prompts ~= false end)
+
+        Fly.Pinned = false
+        local Hum, Root = Fly.Hum, Fly.Root
+
+        local Cam = Workspace.CurrentCamera
+        if Cam then
+            if Root and Root.Parent then Cam.CFrame = Root.CFrame * CFrame.new(0, 1.5, 0) end
+            Cam.CameraType = Enum.CameraType.Custom
+            if Hum and Hum.Parent then Cam.CameraSubject = Hum end
+        end
+
+        Fly.Char, Fly.Hum, Fly.Root, Fly.Frozen, Fly.Saved = nil, nil, nil, nil, nil
+        pcall(RefreshWidget, "Freecam")
+        if not Silent then  end
+    end
+
+    local function Enable()
+        if Fly.Active then return true end
+        local Cam = Workspace.CurrentCamera
+        if not (Cam and Character and Humanoid and RootPart and Character.Parent and Humanoid.Health > 0) then return false end
+
+        Fly.Active = true
+        State.Freecam = true
+        pcall(Functions.SetFreecamESPOff, true)
+        Fly.Char, Fly.Hum, Fly.Root = Character, Humanoid, RootPart
+        Fly.Saved = {
+            Anchored = RootPart.Anchored,
+            AutoRotate = Humanoid.AutoRotate,
+            JumpPower = Humanoid.JumpPower,
+            JumpHeight = Humanoid.JumpHeight,
+            Prompts = ProximityPromptService.Enabled,
+        }
+        Fly.Frozen = RootPart.CFrame
+        Fly.Pinned = false
+        local Rx, Ry = Cam.CFrame:ToOrientation()
+        Fly.Pitch = math.clamp(Rx, -MaxPitch, MaxPitch)
+        Fly.Yaw = Ry
+        Fly.Pos = Cam.CFrame.Position
+        Fly.Pad = Vector3.zero
+        Fly.RMB = false
+        table.clear(Fly.Touches)
+
+        Cam.CameraType = Enum.CameraType.Scriptable
+        pcall(function() ProximityPromptService.Enabled = false end)
+
+        if Globals.SetMoveGate then Globals.SetMoveGate(true) end
+        if not Globals.MoveHooked then
+            pcall(function()
+                ContextActionService:BindActionAtPriority("DoorsFreecamSink", function()
+                    return Enum.ContextActionResult.Sink
+                end, false, Enum.ContextActionPriority.High.Value + 100,
+                    Enum.KeyCode.W, Enum.KeyCode.A, Enum.KeyCode.S, Enum.KeyCode.D,
+                    Enum.KeyCode.Space, Enum.KeyCode.Up, Enum.KeyCode.Down,
+                    Enum.KeyCode.Left, Enum.KeyCode.Right)
+            end)
+        end
+
+        Fly.Conns.Began = UserInputService.InputBegan:Connect(function(I, Gp)
+            if Gp then return end
+            if I.UserInputType == Enum.UserInputType.Touch then
+                local CamNow = Workspace.CurrentCamera
+                local View = CamNow and CamNow.ViewportSize or Vector2.new(800, 600)
+                if I.Position.X >= View.X * 0.5 then
+                    Fly.Touches[I] = true
+                end
+            elseif I.UserInputType == Enum.UserInputType.MouseButton2 then
+                Fly.RMB = true
+                if not Fly.MouseSet then
+                    Fly.MouseSet = true
+                    Fly.PrevMouse = UserInputService.MouseBehavior
+                end
+                UserInputService.MouseBehavior = Enum.MouseBehavior.LockCurrentPosition
+            end
+        end)
+        Fly.Conns.Ended = UserInputService.InputEnded:Connect(function(I)
+            Fly.Touches[I] = nil
+            if I.UserInputType == Enum.UserInputType.MouseButton2 and Fly.RMB then
+                Fly.RMB = false
+                if Fly.MouseSet then
+                    Fly.MouseSet = false
+                    UserInputService.MouseBehavior = Fly.PrevMouse or Enum.MouseBehavior.Default
+                end
+            end
+        end)
+        Fly.Conns.Changed = UserInputService.InputChanged:Connect(function(I)
+            local T = I.UserInputType
+            if T == Enum.UserInputType.Touch then
+                if Fly.Touches[I] then Rotate(I.Delta.X, I.Delta.Y, 0.009) end
+            elseif T == Enum.UserInputType.MouseMovement then
+                if Fly.RMB or UserInputService.MouseBehavior == Enum.MouseBehavior.LockCenter then
+                    Rotate(I.Delta.X, I.Delta.Y, 0.006)
+                end
+            elseif T == Enum.UserInputType.Gamepad1 and I.KeyCode == Enum.KeyCode.Thumbstick2 then
+                Fly.Pad = I.Position
+            end
+        end)
+        Fly.Conns.Died = Humanoid.Died:Connect(function() Disable(true) end)
+        Fly.Conns.Removing = LocalPlayer.CharacterRemoving:Connect(function() Disable(true) end)
+
+        pcall(function() RunService:UnbindFromRenderStep(StepName) end)
+        RunService:BindToRenderStep(StepName, Enum.RenderPriority.Last.Value, Step)
+        return true
+    end
+
+    function Functions.SetFreecam(On, Silent)
+        if On then
+            if Fly.Active then return true end
+            if Enable() then
+                pcall(RefreshWidget, "Freecam")
+                if not Silent then  end
+                return true
+            end
+            return false
+        end
+        Disable(Silent)
+        return false
+    end
+end
+
 Tabs.Camera:AddSwitch("Bật FOV", false, function(S)
     State.FOVEnabled = S
     local cam = Workspace.CurrentCamera
@@ -2043,6 +2321,19 @@ Tabs.Camera:AddSwitch("Xoá sương mù", false, function(S)
     Lighting.FogEnd = S and 10000000 or OldFog
     for _, Object in FogInstances do Object.Density = S and 0 or (Object:GetAttribute("Density_Old") or 0) end
 end)
+
+do
+    local SecFly = MakeSection(Tabs.Camera, "Freecam", false)
+    SecFly:AddButton("Bật/tắt Freecam", "Bấm", function()
+        Functions.SetFreecam(not State.Freecam)
+    end)
+    SecFly:AddSlider("Tốc độ bay", 5, 300, 50, function(v)
+        State.FreecamSpeed = v
+    end)
+    SecFly:AddSlider("Độ nhạy xoay", 0.2, 5, 1, function(v)
+        State.FreecamSens = v
+    end, 1)
+end
 
 local PromptLastFire = setmetatable({}, { __mode = "k" })
 local PromptsToFire = {}; local PromptCooldown = {}; local TriggerDebounce = false; local LastAutoInteractFire = 0
@@ -2197,22 +2488,21 @@ end)
 
 function Functions.HandleCharacter(NewChar)
     if Connections.MainHandler then Connections.MainHandler:Disconnect() end
-    if Connections.AutoClosetHandler then Connections.AutoClosetHandler:Disconnect() end
+
+    if State.Freecam then Functions.SetFreecam(false, true) end
 
     Character = NewChar
     Humanoid = NewChar:WaitForChild("Humanoid", 9e9)
 
     if Connections.SpeedLock then Connections.SpeedLock:Disconnect() end
-    pcall(function()
-        local LT = NewChar:FindFirstChild("LowerTorso")
-        if LT and LT:FindFirstChild("Root") then Globals.OriginalC1 = LT.Root.C1 end
-    end)
-    Globals.C1Locked = false
     Globals.WallPassLinger = false
     Globals.WallPassPrev = false
     Globals.WallPassY = nil
+    Globals.AntiRush = { Drop = 0, OldHip = nil, Wants = false, Hold = 0 }
+    Globals.RealCrouch = false
+    Globals.LastForcedCrouch = 0
     Connections.SpeedLock = Humanoid:GetPropertyChangedSignal("WalkSpeed"):Connect(function()
-        if State.SpeedBoost and Humanoid and Humanoid.WalkSpeed ~= State.SpeedValue then
+        if State.SpeedBoost and not State.Freecam and Humanoid and Humanoid.WalkSpeed ~= State.SpeedValue then
             Humanoid.WalkSpeed = State.SpeedValue
         end
     end)
@@ -2220,7 +2510,8 @@ function Functions.HandleCharacter(NewChar)
     CurrentCamera = Workspace.CurrentCamera
     Camera = Workspace.CurrentCamera
 
-    while not LocalPlayer.PlayerGui:FindFirstChild("MainUI") do task.wait() end
+    Main_Game = nil
+    LocalPlayer.PlayerGui:WaitForChild("MainUI", 30)
 
     task.spawn(function()
         task.wait(0.8)
@@ -2243,6 +2534,10 @@ function Functions.HandleCharacter(NewChar)
         if State.RemoveA90 and ModuleRefs.A90 then ModuleRefs.A90.Name = "A90_Disabled" end
         if State.RemoveDread and ModuleRefs.Dread then ModuleRefs.Dread.Name = "Dread_Disabled" end
         if State.DisableEntityJumpscares and ModuleRefs.SpiderJumpscare then ModuleRefs.SpiderJumpscare.Name = "SpiderJumpscare_Disabled" end
+        local UI = LocalPlayer.PlayerGui:FindFirstChild("MainUI")
+        local MF = UI and UI:FindFirstChild("MainFrame")
+        Globals.SurgeFrame = MF and (MF:FindFirstChild("SurgeVignette") or MF:FindFirstChild("SurgeVignette_Disabled")) or nil
+        if State.RemoveSurge and Globals.SurgeFrame then Globals.SurgeFrame.Name = "SurgeVignette_Disabled" end
     end)
 
     Collision = NewChar:WaitForChild("Collision", 9e9)
@@ -2252,10 +2547,33 @@ function Functions.HandleCharacter(NewChar)
     CollisionClone = Collision:Clone(); CollisionClone.Parent = NewChar; CollisionClone.Name = "CollisionClone"; CollisionClone.Massless = true
     CollisionPartClone = CollisionPart:Clone(); CollisionPartClone.Parent = NewChar; CollisionPartClone.Name = "CollisionPartClone"; CollisionPartClone.CanCollide = false; CollisionPartClone.Massless = true
 
-    Connections.MainHandler = RunService.RenderStepped:Connect(function()
+    Connections.MainHandler = RunService.RenderStepped:Connect(function(dt)
         if not Character or not Humanoid or not RootPart or not Collision then return end
 
-        if State.SpeedBoost and Humanoid.WalkSpeed ~= State.SpeedValue then Humanoid.WalkSpeed = State.SpeedValue end
+        if State.SpeedBoost and not State.Freecam and Humanoid.WalkSpeed ~= State.SpeedValue then Humanoid.WalkSpeed = State.SpeedValue end
+        -- ===== Anti Rush / Ambush =====
+        local AR = Globals.AntiRush
+        local IsFools = Floor == "Fools" or Floor == "OldHotel"
+        local InMinecart = Functions.GetMinecart()
+        local Safe = not State.Freecam and Humanoid.Health > 0 and not RootPart.Anchored
+            and Character:GetAttribute("Hiding") ~= true and not InMinecart
+        if State.AntiRush and Safe and Functions.GetNearestRushEntity() then
+            AR.Hold = tick() + AntiRushCfg.Hold
+        end
+        AR.Wants = State.AntiRush == true and Safe and tick() < AR.Hold
+        local Target = (AR.Wants and not IsFools) and (State.AntiRushDepth or 3) or 0
+        local Step = AntiRushCfg.Ramp * (dt or 0.016)
+        if AR.Drop < Target then AR.Drop = math.min(Target, AR.Drop + Step)
+        else AR.Drop = math.max(Target, AR.Drop - Step) end
+        if AR.Drop > 0 then
+            if AR.OldHip == nil then AR.OldHip = Humanoid.HipHeight end
+            Humanoid.HipHeight = math.max(AntiRushCfg.MinHip, AR.OldHip - AR.Drop)
+        elseif AR.OldHip ~= nil then
+            Humanoid.HipHeight = AR.OldHip
+            AR.OldHip = nil
+        end
+        local Drop = AR.OldHip and (AR.OldHip - Humanoid.HipHeight) or 0
+
         if State.WallPass then
             Globals.WallPassLinger = false
         elseif Globals.WallPassPrev then
@@ -2264,11 +2582,13 @@ function Functions.HandleCharacter(NewChar)
             Globals.WallPassLinger = false
         end
         Globals.WallPassPrev = State.WallPass and true or false
-        local NoCol = State.PositionSpoof or State.WallPass or Globals.WallPassLinger == true
+        local NoCol = State.WallPass or Globals.WallPassLinger == true
 
-        if Floor == "OldHotel" or Floor == "Fools" then
+        -- ===== Tắt va chạm các part của nhân vật (đi qua vật cản thấp khi cúi; va chạm thật do CollisionClone đảm nhiệm) =====
+
+        if IsFools then
             local GodmodeSpoof = State.FigureGodmode and Functions.GetNearestFigure() ~= nil
-            local SpoofOffset = (State.PositionSpoof or GodmodeSpoof) and 200 or 0
+            local SpoofOffset = (AR.Wants and 200) or (GodmodeSpoof and 200) or 0
             Globals.SpoofOffset = SpoofOffset
             Collision.Position = RootPart.Position + Vector3.new(0, SpoofOffset, 0)
             Collision.CanCollide = false
@@ -2279,13 +2599,27 @@ function Functions.HandleCharacter(NewChar)
             RootPart.CanCollide = not NoCol
         else
             Collision.CanCollide = false
-            if Collision:FindFirstChild("CollisionCrouch") then Collision.CollisionCrouch.CanCollide = false end
+            local CC = Collision:FindFirstChild("CollisionCrouch")
+            if CC then CC.CanCollide = false end
             if CollisionClone and CollisionClone:FindFirstChild("CollisionCrouch") then
                 local IsCrouch = Functions.IsCrouching()
                 CollisionClone.CanCollide = not (NoCol or IsCrouch)
                 CollisionClone.CollisionCrouch.CanCollide = not (NoCol or not IsCrouch)
             else
                 RootPart.CanCollide = not NoCol
+            end
+
+            if Drop > 0.001 then
+                local Rp = RootPart.Position
+                Collision.Position = Rp + Vector3.new(0, 0.18 + Drop, 0)
+                if CollisionPart then CollisionPart.Position = Rp + Vector3.new(0, 0.18 + Drop, 0) end
+                if CC and CollisionClone and CollisionClone:FindFirstChild("CollisionCrouch") then
+                    CC.Position = Rp + Vector3.new(0, -0.982 + Drop, 0)
+                    CollisionClone.CollisionCrouch.Position = Rp + Vector3.new(0, -0.982 + Drop, 0)
+                end
+                if CollisionClone then
+                    CollisionClone.Position = Rp + Vector3.new(0, 0.18 + Drop, 0)
+                end
             end
         end
 
@@ -2307,9 +2641,15 @@ function Functions.HandleCharacter(NewChar)
             Globals.WallPassBody.MaxForce = Vector3.new(9e9, 9e9, 9e9)
         end
         local WPCam = Workspace.CurrentCamera
-        local WPActive = State.WallPass or Globals.WallPassLinger == true
+        local WPActive = (State.WallPass or Globals.WallPassLinger == true) and not State.Freecam
         if WPActive and WPCam then
-            if not Globals.WallPassY then Globals.WallPassY = RootPart.Position.Y end
+            if not Globals.WallPassY then
+                Globals.WallPassY = RootPart.Position.Y
+                Globals.WallPassPrevDrop = Drop
+            end
+            -- Anti Rush hạ root: kéo mốc độ cao theo để hai tính năng không tranh chấp
+            Globals.WallPassY = Globals.WallPassY - (Drop - Globals.WallPassPrevDrop)
+            Globals.WallPassPrevDrop = Drop
             local Dir = Vector3.zero
             if State.WallPass then
                 local Look = WPCam.CFrame.LookVector
@@ -2339,27 +2679,13 @@ if MG and type(MG) == "table" then
 end
 end)
 
-    local LastHide = 0
-    Connections.AutoClosetHandler = RunService.Heartbeat:Connect(function()
-        if not State.AutoCloset then return end
-        if tick() - LastHide < 0.2 then return end
-        LastHide = tick()
-        for _, E in Objects.Entities do
-            local Alias = Entities[E.Name] and Entities[E.Name].Alias
-            if Alias and E.PrimaryPart then
-                local D = LocalPlayer:DistanceFromCharacter(E.PrimaryPart.Position)
-                if D < 85 and Character:GetAttribute("Hiding") ~= true then
-                    local Closest, CD = nil, math.huge
-                    for _, H in Objects.HidingSpots do
-                        if H.PrimaryPart then
-                            local HD = LocalPlayer:DistanceFromCharacter(H.PrimaryPart.Position)
-                            if HD < CD and HD < 50 then CD = HD; Closest = H end
-                        end
-                    end
-                    if Closest and Closest:FindFirstChild("HidePrompt") then
-                        if fireproximityprompt then pcall(fireproximityprompt, Closest.HidePrompt) end
-                    end
-                end
+    if Connections.AutoReviveHandler then Connections.AutoReviveHandler:Disconnect() end
+    Connections.AutoReviveHandler = LocalPlayer:GetAttributeChangedSignal("Alive"):Connect(function()
+        if LocalPlayer:GetAttribute("Alive") == false and State.AutoRevive and (Floor == "Fools" or Floor == "OldHotel") then
+            while LocalPlayer:GetAttribute("Alive") ~= true and State.AutoRevive do
+                local R = RemotesFolder:FindFirstChild("Revive")
+                if R then R:FireServer() end
+                task.wait(0.5)
             end
         end
     end)
@@ -2375,7 +2701,7 @@ end)
         local MobileButtons = MainFrame:FindFirstChild("MobileButtons"); if not MobileButtons then return end
         local JumpButton = MobileButtons:FindFirstChild("JumpButton"); if not JumpButton then return end
         JumpButtonConnection = JumpButton.MouseButton1Down:Connect(function()
-            if not State.InfiniteJumps then return end
+            if not State.InfiniteJumps or State.Freecam then return end
             if not Humanoid or Humanoid.Health <= 0 then return end
             Humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
         end)
@@ -2435,7 +2761,16 @@ function Functions.HandleObject(Object)
         for _, C in Object:GetChildren() do
             if C.Name == "Door" and C:IsA("BasePart") then table.insert(DoorParts, C) end
         end
-        if #DoorParts >= 1 then
+        if #DoorParts == 0 then
+            local T0 = os.clock()
+            repeat
+                task.wait(0.05)
+                for _, C in Object:GetChildren() do
+                    if C.Name == "Door" and C:IsA("BasePart") then table.insert(DoorParts, C) end
+                end
+            until #DoorParts >= 1 or os.clock() - T0 > 5 or not Object:IsDescendantOf(Workspace)
+        end
+        if #DoorParts >= 1 and Object:IsDescendantOf(Workspace) then
 
             local Model = Instance.new("Model", Object)
             Model.Name = "ESPModel"; Instance.new("Humanoid", Model).Name = "ESPHumanoid"
@@ -2448,7 +2783,7 @@ function Functions.HandleObject(Object)
             end
             table.insert(Objects.Doors, Model)
             if State.DoorESP then
-                Functions.AddESP({ Object = Model, Text = "Cửa " .. Functions.GetDoorNumber(Object), Color = State.DoorColor }, true)
+                Functions.AddESP({ Object = Model, Text = "Cửa " .. Functions.GetDoorNumber(Object), Color = State.DoorColor, Priority = 100 }, true)
             end
         end
         table.insert(DoorReachTargets, Object)
@@ -2476,7 +2811,6 @@ function Functions.HandleObject(Object)
             if Object.PrimaryPart then
                 Body = Body .. " — cách bạn " .. math.round(LocalPlayer:DistanceFromCharacter(Object.PrimaryPart.Position)) .. " studs"
             end
-            Functions.Notify("⭐ " .. I18N.Tr(ItemNames[Name]), Body, Color3.fromRGB(255, 215, 0))
         end
         if State.ItemESP then
             local Label = ItemNames[Name]
@@ -2523,6 +2857,10 @@ function Functions.HandleObject(Object)
                 Color  = State.ItemColor
             }, false)
         end
+
+    elseif Name == "GoldPile" and Object:IsA("Model") then
+        table.insert(Objects.Gold, Object)
+        if State.GoldESP then Functions.AddESP({ Object = Object, Text = "Vàng", Color = State.GoldColor }, true) end
 
     elseif Name == "Ladder" then
         table.insert(Objects.Ladders, Object)
@@ -2687,7 +3025,6 @@ elseif Name == "DoorFake" or Name == "FakeDoor" then
 
 elseif Name == "ElevatorBreaker" then
     if State.AutoBreakerBox and not Globals.BreakerBoxNotified then
-        Functions.Notify("Breaker Box", "Hãy tương tác với hộp cầu giao — sẽ tự động giải")
         Globals.BreakerBoxNotified = true
     end
     task.spawn(function()
@@ -2707,7 +3044,6 @@ elseif Name == "ElevatorBreaker" then
             if State.AutoBreakerBox then
                 if not Globals.BreakerBoxStartNotified
                    and (Floor == "Fools" or Floor == "OldHotel") then
-                    Functions.Notify("Breaker Box", "Đang giải... vui lòng đợi")
                     Globals.BreakerBoxStartNotified = true
                 end
                 pcall(function() RemotesFolder.EBF:FireServer() end)
@@ -2726,7 +3062,6 @@ elseif Name == "ElevatorCar" then
         if State.AutoBreakerBox
            and Desc.Name == "TouchInterest"
            and not Globals.BreakerBoxFinishedNotified then
-            Functions.Notify("Breaker Box", "Đã giải thành công! Hãy tới thang máy")
             Globals.BreakerBoxFinishedNotified = true
         end
     end)
@@ -2758,7 +3093,6 @@ elseif Name == "Padlock" then
 
         Object.Destroying:Once(function()
             if PadlockFired and PadlockDist <= 100 then
-                Functions.Notify("Thư viện", "Đã mở khoá thư viện thành công!", Color3.fromRGB(0, 255, 130))
             end
             if Connections.PadlockConnection then
                 Connections.PadlockConnection:Disconnect()
@@ -2829,6 +3163,19 @@ elseif Name == "Padlock" then
             end
             return Best
         end
+        local Registered = {}
+        local function Register()
+            for _, Node in Object:GetChildren() do
+                if not Registered[Node] and Node:GetAttribute("ForceConnect") then
+                    local NextNode = GetClosestNode(Node)
+                    if NextNode then
+                        Registered[Node] = true
+                        Node:SetAttribute("Turn", GetDirection(Node, NextNode))
+                        table.insert(Objects.SeekNodes, Node)
+                    end
+                end
+            end
+        end
         task.spawn(function()
 
             for _, Node in Object:GetChildren() do
@@ -2843,12 +3190,10 @@ elseif Name == "Padlock" then
                 task.wait()
             end
 
-            for _, Node in Object:GetChildren() do
-                if Node:GetAttribute("ForceConnect") then
-                    local NextNode = GetClosestNode(Node)
-                    if NextNode then Node:SetAttribute("Turn", GetDirection(Node, NextNode)); table.insert(Objects.SeekNodes, Node) end
-                end
-                task.wait()
+            Register()
+            while Object and Object.Parent do
+                task.wait(1)
+                Register()
             end
         end)
 
@@ -2944,12 +3289,16 @@ end
 local function QueueObject(Object)
     if not AllowedNames[Object.Name] and Object.ClassName ~= "ProximityPrompt"
         and not ItemNames[Object.Name] and not Entities[Object.Name] then return end
-    table.insert(ObjectQueue, Object)
+    if Object.Name == "Door" then table.insert(ObjectQueue, 1, Object) else table.insert(ObjectQueue, Object) end
 end
 
 Connections.QueueHandler = RunService.RenderStepped:Connect(function()
-    local Obj = table.remove(ObjectQueue, 1)
-    if Obj then pcall(Functions.HandleObject, Obj) end
+    local T0 = os.clock()
+    while os.clock() - T0 < 0.004 do
+        local Obj = table.remove(ObjectQueue, 1)
+        if not Obj then break end
+        task.spawn(pcall, Functions.HandleObject, Obj)
+    end
 end)
 
 for _, Obj in Workspace:GetDescendants() do task.spawn(function() QueueObject(Obj) end) end
@@ -3096,7 +3445,6 @@ end)
 
 Connections.BypassHandler = RunService.Heartbeat:Connect(function()
     if not Character or not RootPart or not Collision then return end
-    if State.PositionSpoof then Collision.Position = RootPart.Position + Vector3.new(0, 2.328, 0) end
     local IsEyes    = Workspace:FindFirstChild("Eyes") ~= nil
 local IsLookman = Workspace:FindFirstChild("Lookman") ~= nil
 local IsBackdoorLookman = Workspace:FindFirstChild("BackdoorLookman") ~= nil
@@ -3106,8 +3454,13 @@ if ((State.BypassEyes and IsEyes) or (State.BypassLookman and (IsLookman or IsBa
     else RemotesFolder.MotorReplication:FireServer(-650) end
 end
     if RemotesFolder and RemotesFolder:FindFirstChild("Crouch") and tick() - LastCrouchFire > 0.1 then
-        local IsCrouch = Functions.IsCrouching()
-        if State.CrouchSpoof or State.PositionSpoof then IsCrouch = true end
+        local Forced = Functions.IsCrouchForced()
+        if Forced then
+            Globals.LastForcedCrouch = tick()
+        elseif tick() - (Globals.LastForcedCrouch or 0) > 0.5 then
+            Globals.RealCrouch = Functions.IsCrouching() == true
+        end
+        local IsCrouch = Forced or Globals.RealCrouch == true
         pcall(function() RemotesFolder.Crouch:FireServer(IsCrouch, true) end)
         LastCrouchFire = tick()
     end
@@ -3136,18 +3489,55 @@ task.spawn(function()
     if not Functions.CheckCompatability({"require"}) then return end
     local Ok, Controls = pcall(function() return require(PM):GetControls() end)
     if not Ok or not Controls then return end
-    local Original = Controls.GetMoveVector; Globals.OriginalGetMoveVector = Original
+    local Original = Controls.GetMoveVector
+    local OriginalMove = Controls.moveFunction
+    Globals.OriginalGetMoveVector = Original
+    Globals.OriginalMoveFunction = OriginalMove
+    Globals.Controls = Controls
+
+    local function TurnDir(Node)
+        local Turn = Node:GetAttribute("Turn")
+        if Turn == "Left" then return -1 end
+        if Turn == "Right" then return 1 end
+        return 0
+    end
+
+    local function SteerVector(Dir)
+        if Dir == 0 then return Vector3.zero end
+        local MG = Functions.GetMainGame()
+        local Ax = 0
+        if type(MG) == "table" then Ax = tonumber(MG.ax) or 0 end
+        return CFrame.Angles(0, -math.rad(Ax), 0):VectorToWorldSpace(Vector3.new(Dir, 0, 0))
+    end
+
     Controls.GetMoveVector = function(...)
         if State.AutoSteerMinecart and Floor == "Mines" then
             local Node = Globals.NearestTurnNode
             if Node and Node.Parent and Functions.GetMinecart() then
-                local Turn = Node:GetAttribute("Turn")
-                if Turn == "Left" then return Vector3.new(-1, 0, 0) end
-                if Turn == "Right" then return Vector3.new(1, 0, 0) end
-                return Vector3.zero
+                return SteerVector(TurnDir(Node))
             end
         end
+        local Fly = Globals.Fly
+        if Fly and Fly.Active then return Vector3.zero end
         return Original(...)
+    end
+
+    local Gate = function(Player, Vec, CamRel, ...)
+        local Fly = Globals.Fly
+        if Fly and Fly.Active and not Functions.GetMinecart() then
+            return OriginalMove(Player, Vector3.zero, CamRel, ...)
+        end
+        return OriginalMove(Player, Vec, CamRel, ...)
+    end
+
+    Globals.MoveHooked = type(OriginalMove) == "function"
+    Globals.SetMoveGate = function(On)
+        if type(OriginalMove) ~= "function" then return end
+        if On then
+            if Controls.moveFunction ~= Gate then Controls.moveFunction = Gate end
+        elseif Controls.moveFunction == Gate then
+            Controls.moveFunction = OriginalMove
+        end
     end
 end)
 
@@ -3156,11 +3546,17 @@ if Functions.CheckCompatability({"hookmetamethod"}) then
         local ok = pcall(function()
             local oldHook
             oldHook = hookmetamethod(game, "__namecall", newcclosure(function(Self, ...)
-                local Method = getnamecallmethod()
-                if State.AutoHeartbeatMinigame then
-                    if (Self.Name == "ClutchHeartbeat" or Self.Name == "HideMonster")
-                        and Method == "FireServer" then
-                        return
+                if getnamecallmethod() == "FireServer" then
+                    local Ok, N = pcall(function() return Self.Name end)
+                    if Ok then
+                        if State.AutoHeartbeatMinigame and (N == "ClutchHeartbeat" or N == "HideMonster") then return end
+                        if N == "Crouch" and not (type(checkcaller) == "function" and checkcaller()) then
+                            local Wanted = ...
+                            Globals.RealCrouch = Wanted == true
+                            if Wanted ~= true and Functions.IsCrouchForced() then
+                                return oldHook(Self, true, select(2, ...))
+                            end
+                        end
                     end
                 end
                 return oldHook(Self, ...)
@@ -3261,6 +3657,10 @@ if LocalPlayer.Character then task.spawn(function() Functions.HandleCharacter(Lo
 Connections.CharacterAdded = LocalPlayer.CharacterAdded:Connect(function(NewChar) task.wait(0.5); Functions.HandleCharacter(NewChar) end)
 
 function Functions.Unload()
+    pcall(Functions.SetFreecam, false, true)
+    pcall(SwapDamageRemotes, { "Screech", "Shade", "A90", "Surge" }, false)
+    for Obj, C in pairs(DoorReachConnections) do pcall(function() C:Disconnect() end); DoorReachConnections[Obj] = nil end
+    DoorReachEnabled = false
     for _, C in pairs(Connections) do
         pcall(function()
             if typeof(C) == "RBXScriptConnection" then C:Disconnect()
@@ -3284,9 +3684,10 @@ function Functions.Unload()
     State.ThirdPerson = false
     State.WallPass = false
     pcall(function() if Globals.WallPassBody then Globals.WallPassBody:Destroy() end end)
+    State.AntiRush = false
     pcall(function()
-        local LT = Character and Character:FindFirstChild("LowerTorso")
-        if LT and LT:FindFirstChild("Root") and Globals.OriginalC1 and not Globals.C1Locked then LT.Root.C1 = Globals.OriginalC1 end
+        local AR = Globals.AntiRush
+        if AR and AR.OldHip and Humanoid then Humanoid.HipHeight = AR.OldHip; AR.OldHip = nil; AR.Drop = 0 end
     end)
     pcall(function() ScreenGui:Destroy() end)
     pcall(function()
@@ -3297,7 +3698,11 @@ function Functions.Unload()
         local PM = PS and PS:FindFirstChild("PlayerModule")
         if PM then
             local Ok, Controls = pcall(function() return require(PM):GetControls() end)
-            if Ok and Controls then Controls.GetMoveVector = Globals.OriginalGetMoveVector end
+            if Ok and Controls then
+                Controls.GetMoveVector = Globals.OriginalGetMoveVector
+                if Globals.SetMoveGate then Globals.SetMoveGate(false) end
+                Globals.MoveHooked = false
+            end
         end
     end
 end)
@@ -3376,8 +3781,5 @@ task.spawn(function()
 end)
 
 local LoadTime = math.floor((tick() - LoadStart) * 1000) / 1000
-Functions.NotifySuccess(
-    "✅ CourierCat Hub đã load",
-    ("Thời gian: %ss"):format(LoadTime)
-)
+Functions.Notify("✅ CourierCat Hub đã load", ("Thời gian: %ss"):format(LoadTime), "success")
 return ESP
