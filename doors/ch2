@@ -1658,26 +1658,113 @@ local function UpdateBeamColor(BeamTable, Value)
     for _, Beam in BeamTable do if Beam and Beam.Parent then Beam.Color = Seq end end
 end
 
+local SecSeek   = MakeSection(Tabs.Floors, "Seek", true)
+local SecEye    = MakeSection(Tabs.Floors, "Eyestalk", false)
+local SecFigure = MakeSection(Tabs.Floors, "Figure", false)
 local SecFloorBypass = MakeSection(Tabs.Floors, "Bypass", false)
 SecFloorBypass:AddSwitch("Hồi sinh vô hạn (Fools/OldHotel)", false, function(S)
     State.AutoRevive = S
 end)
 
+SecSeek:AddSwitch("Đường Seek", false, function(S) State.ShowSeekPath = S; UpdateBeamVisibility(Objects.SeekHighlights, S) end)
 
 Globals.ColorChoices = { ["Hồng"] = Color3.fromRGB(255, 105, 180), ["Xanh lá"] = Color3.fromRGB(0, 255, 0), ["Xanh biển"] = Color3.fromRGB(0, 120, 255), ["Đen"] = Color3.fromRGB(0, 0, 0) }
 
+SecSeek:AddDropdown("Màu Seek", { "Xanh lá", "Hồng", "Xanh biển", "Đen" }, function(V)
+    local C = Globals.ColorChoices[V]
+    if C then State.ShowSeekPathColor = C; UpdateBeamColor(Objects.SeekHighlights, C) end
+end)
 
+SecEye:AddSwitch("Đường Eyestalk", false, function(S) State.ShowEyestalkPath = S; UpdateBeamVisibility(Objects.EyestalkHighlights, S) end)
 
+SecEye:AddDropdown("Màu Eyestalk", { "Xanh biển", "Hồng", "Xanh lá", "Đen" }, function(V)
+    local C = Globals.ColorChoices[V]
+    if C then State.ShowEyestalkPathColor = C; UpdateBeamColor(Objects.EyestalkHighlights, C) end
+end)
 
+SecSeek:AddSwitch("Tự lái Minecart", false, function(S) State.AutoSteerMinecart = S end)
 
+SecSeek:AddSwitch("Bỏ chướng ngại", false, function(S)
+    State.BypassSeekObstructions = S
+    for _, Obj in Objects.SeekObstructions do
+        if Obj and Obj.Parent then
+            Obj.CanTouch = not S
+            if Obj.Name == "SeekFloodline" then Obj.CanCollide = S end
+        end
+    end
+    for _, Bridge in Objects.SeekBridges do
+        if Bridge and Bridge.Parent then Bridge.CanCollide = S; Bridge.Transparency = S and 0 or 1 end
+    end
+end)
 
+SecSeek:AddSwitch("Anti Seeking Wall", false, function(S)
+    State.BypassSeekingWall = S
+    for _, O in Objects.Obstructions do
+        if O.Name == "ScaryWall" then
+            for _, P in O:GetDescendants() do
+                if P:IsA("BasePart") then P.CanTouch = not S; P.CanCollide = not S end
+            end
+        end
+    end
+end)
 
+SecSeek:AddSwitch("Xoá trigger Seek", false, function(S)
+    State.RemoveSeekTrigger = S
+    if S then
+        for _, O in Objects.EventTriggers do Functions.StartSeekTrigger(O) end
+    end
+end)
 
+SecFigure:AddSwitch("Figure Godmode", false, function(S)
+    State.FigureGodmode = S
+end)
 
+SecFigure:AddSwitch("Auto Minigame(beta)", false, function(S)
+    State.AutoHeartbeatMinigame = S
+end)
 
+SecFigure:AddSwitch("Xoá Figure", false, function(S)
+    State.RemoveFigure = S
+    if S then
+        for _, O in ipairs(Objects.Entities) do
+            if FigureNames[O.Name] then
+                for _, P in O:GetDescendants() do
+                    if P:IsA("BasePart") then
+                        P.CanCollide = false
+                        pcall(function() P.Position = Vector3.new(-49999, -49999, -49999) end)
+                    end
+                end
+            end
+        end
+    end
+end)
 
+SecFigure:AddSwitch("Tự mở khoá thư viện", false, function(S)
+    State.AutoUnlockPadlock = S
+end)
 
+SecFigure:AddSlider("Cự ly mở khoá", 1, 50, 10, function(V)
+    State.AutoUnlockDistance = V
+end)
 
+SecFigure:AddSwitch("Tự giải cầu giao", false, function(S)
+    State.AutoBreakerBox = S
+    Globals.BreakerBoxNotified         = false
+    Globals.BreakerBoxStartNotified    = false
+    Globals.BreakerBoxFinishedNotified = false
+    if S then
+        local BreakerBox = CurrentRooms:FindFirstChild("ElevatorBreaker", true)
+        if BreakerBox then
+            if not Globals.BreakerBoxInteracted then
+                Globals.BreakerBoxNotified = true
+            else
+                pcall(function() RemotesFolder.EBF:FireServer() end)
+            end
+        else
+        end
+    else
+    end
+end)
 
 -- ============================================================
 -- ESP: ESPApply[Key](S) bật/tắt thật sự; ESPWanted[Key]: người dùng muốn bật hay không
