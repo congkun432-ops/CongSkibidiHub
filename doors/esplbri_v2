@@ -45,6 +45,7 @@ ESP.TextTable            = {}
 ESP.ConnectionsTable     = {}
 ESP.Objects              = {}
 ESP.TotalObjects         = {}
+ESP.Meta                 = {}
 
 local RainbowConnection, EntityAlertConnection   -- khai báo trước để ESP:Unload() thấy được
 local RainbowState = { HueSetup = 0, Hue = 0, Step = 0, Color = Color3.new() }
@@ -120,6 +121,7 @@ local function DestroyObjectData(Object)
     ESP.ElementsEnabled[Object] = nil
     ESP.TransparencyEnabled[Object] = nil
     ESP.Objects[Object] = nil
+    ESP.Meta[Object] = nil
     for I = #ESP.TotalObjects, 1, -1 do
         if ESP.TotalObjects[I] == Object then table.remove(ESP.TotalObjects, I); break end
     end
@@ -131,20 +133,20 @@ end
 
 function ESP:AddESP(Params)
     local Object = Params.Object
-    if ESP.ElementsEnabled[Object] or ESP.Unloaded then return end
+    if ESP.Unloaded or not Object then return end
+    if ESP.ElementsEnabled[Object] then return end
+    if ESP.ElementsEnabled[Object] == false then DestroyObjectData(Object) end
     if not Object:IsA("BasePart") and not Object:IsA("Model") then return end
-    local NoTracer = Params.NoTracer and true or false           -- true: không bao giờ kẻ đường nối cho vật này (chỉ hiện ESP)
-    local AlwaysTracer = Params.AlwaysTracer and true or false   -- true: luôn kẻ đường nối (kể cả ngoài màn hình / sau lưng)
 
     ESP.ElementsEnabled[Object] = true
     ESP.TransparencyEnabled[Object] = false
     ESP.ConnectionsTable[Object] = ESP.ConnectionsTable[Object] or {}
-    if ESP.Highlights[Object] then ESP.Highlights[Object]:Destroy() end
 
     local Highlight = Instance.new("Highlight")
     Highlight.FillTransparency = 1
     Highlight.OutlineTransparency = 1
     Highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+    Highlight.Enabled = false
     Highlight.Adornee = Object
     Highlight.Parent = HighlightsFolder
     ESP.Highlights[Object] = Highlight
@@ -173,6 +175,11 @@ function ESP:AddESP(Params)
     ESP.ColorTable[Object] = Params.Color
     ESP.TextTable[Object] = Params.Text
     ESP.Objects[Object] = Object
+    ESP.Meta[Object] = {
+        NoTracer = Params.NoTracer and true or false,
+        AlwaysTracer = Params.AlwaysTracer and true or false,
+        Priority = Params.Priority or 0,
+    }
     table.insert(ESP.TotalObjects, Object)
 
     PlayTween(Highlight, { FillTransparency = ESP.FillTransparency })
@@ -185,6 +192,7 @@ function ESP:AddESP(Params)
     LineFrame.Size = UDim2.fromOffset(0, 0)
     LineFrame.BackgroundTransparency = 1
     LineFrame.AnchorPoint = Vector2.new(0.5, 0.5)
+    LineFrame.Visible = false
     LineFrame.Parent = TracersFrame
 
     local Stroke = Instance.new("UIStroke", LineFrame)
@@ -195,136 +203,171 @@ function ESP:AddESP(Params)
     PlayTween(LineFrame, { BackgroundTransparency = 0 })
     PlayTween(Stroke, { Transparency = 0 })
     ESP.Lines[Object] = { LineFrame, Stroke }
+end
 
-    task.spawn(function()
-        local Last = 0
-        local function Render()
-            local Camera = Workspace.CurrentCamera
-            if not Camera then return end
-            if not Object or not Object:IsDescendantOf(game) then ESP:RemoveESP(Object); return end
-            local ObjPos = Object:GetPivot().Position
-            local SP, OnScreen = Camera:WorldToViewportPoint(ObjPos)
-            local Frame = ESP.Frames[Object]
-            local Label = ESP.Labels[Object]
-            local HL = ESP.Highlights[Object]
-            local Line = ESP.Lines[Object]
+local HighlightBudget = 30
+local Candidates = {}
 
-            if Line and Line[1] then Line[1].Visible = (OnScreen or AlwaysTracer) and not NoTracer end
-            if Frame then
-                Frame.Visible = OnScreen
-                if OnScreen then Frame.Position = UDim2.fromOffset(SP.X, SP.Y) end
+local function ByPriority(a, b)
+    if a.Priority ~= b.Priority then return a.Priority > b.Priority end
+    return a.Dist < b.Dist
+end
+
+local function UpdateObject(Object, Camera, Allowed)
+    local Meta = ESP.Meta[Object]
+    local Frame = ESP.Frames[Object]
+    local Label = ESP.Labels[Object]
+    local HL = ESP.Highlights[Object]
+    local Line = ESP.Lines[Object]
+    if not Meta then return end
+    local NoTracer, AlwaysTracer = Meta.NoTracer, Meta.AlwaysTracer
+    local SP, OnScreen, ObjPos, Distance = Meta.SP, Meta.OnScreen, Meta.Pos, Meta.Dist
+    local ActiveColor = ESP.Rainbow and RainbowState.Color or ESP.ColorTable[Object] or Color3.new(1, 1, 1)
+
+    if Frame then
+        Frame.Visible = OnScreen
+        if OnScreen then Frame.Position = UDim2.fromOffset(SP.X, SP.Y) end
+    end
+    if Label then Label.TextColor3 = ActiveColor end
+
+    local ShowHL = OnScreen and Allowed[Object] == true
+    if HL then
+        if HL.Adornee ~= Object then HL.Adornee = Object end
+        HL.Enabled = ShowHL
+        if ShowHL then
+            HL.FillColor = ActiveColor
+            HL.OutlineColor = ESP.MatchColors and ActiveColor or ESP.OutlineColor
+            if ESP.TransparencyEnabled[Object] then
+                HL.FillTransparency = ESP.FillTransparency
+                HL.OutlineTransparency = ESP.OutlineTransparency
             end
-            if not OnScreen then
-                if HL then HL:Destroy(); ESP.Highlights[Object] = nil; HL = nil end
-            elseif ESP.ElementsEnabled[Object] and not HL then
-                HL = Instance.new("Highlight")
-                HL.FillTransparency = 1
-                HL.OutlineTransparency = 1
-                HL.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-                HL.Adornee = Object
-                HL.Parent = HighlightsFolder
-                ESP.Highlights[Object] = HL
+        end
+    end
+
+    if OnScreen and Label then
+        local DText = ESP.ShowDistance and ("\n<font size='" .. math.round(ESP.TextSize * ESP.DistanceSizeRatio) .. "'>[" .. Distance .. "]</font>") or ""
+        Label.Text = (ESP.TextTable[Object] or "") .. DText
+        if ESP.TransparencyEnabled[Object] then
+            Label.TextTransparency = ESP.TextTransparency
+            Label.TextStrokeTransparency = ESP.TextOutlineTransparency
+        end
+    end
+
+    if Line then
+        local Draw = ESP.Tracers and not NoTracer and (OnScreen or AlwaysTracer)
+        Line[1].Visible = Draw and true or false
+        if Draw then
+            local SS = Camera.ViewportSize
+            local Origin
+            if ESP.TracerOrigin == "Center" then
+                Origin = Vector2.new(SS.X / 2, SS.Y / 2)
+            elseif ESP.TracerOrigin == "Top" then
+                Origin = Vector2.new(SS.X / 2, 0)
+            elseif ESP.TracerOrigin == "Mouse" then
+                local M = UserInputService:GetMouseLocation()
+                Origin = Vector2.new(M.X, M.Y)
+            else
+                Origin = Vector2.new(SS.X / 2, SS.Y)
             end
+            local Dest = Vector2.new(SP.X, SP.Y)
+            if AlwaysTracer then
+                local Center = Vector2.new(SS.X / 2, SS.Y / 2)
+                local Dir = Dest - Center
+                if SP.Z < 0 then Dir = -Dir end
+                if Dir.Magnitude < 1 then Dir = Vector2.new(0, 1) end
+                local SX = Dir.X ~= 0 and (Center.X - 24) / math.abs(Dir.X) or math.huge
+                local SY = Dir.Y ~= 0 and (Center.Y - 24) / math.abs(Dir.Y) or math.huge
+                local Scale = math.min(SX, SY)
+                if SP.Z >= 0 then Scale = math.min(Scale, 1) end
+                Dest = Center + Dir * Scale
+            end
+            local Mid = (Origin + Dest) / 2
+            Line[1].Position = UDim2.fromOffset(Mid.X, Mid.Y)
+            Line[1].Size = UDim2.fromOffset((Origin - Dest).Magnitude, 1)
+            Line[1].Rotation = math.deg(math.atan2(Dest.Y - Origin.Y, Dest.X - Origin.X))
+            Line[1].BackgroundColor3 = ActiveColor
+            Line[1].BorderSizePixel = 0
+            Line[2].Color = ActiveColor
+            Line[2].Thickness = ESP.TracerSize
+        end
+    end
 
-            local ActiveColor = ESP.Rainbow and RainbowState.Color or ESP.ColorTable[Object] or Color3.new(1, 1, 1)
-            if Label then Label.TextColor3 = ActiveColor end
+    if ESP.Arrows then
+        local Arrow = ESP.ArrowsTable[Object]
+        if not Arrow then
+            Arrow = ArrowTemplate:Clone()
+            Arrow.Parent = ArrowsFrame
+            ESP.ArrowsTable[Object] = Arrow
+            PlayTween(Arrow, { ImageTransparency = 0 })
+        end
+        if OnScreen and SP.Z > 0 then
+            Arrow.Visible = false
+        else
+            local SS = Camera.ViewportSize
+            local C = Vector2.new(SS.X / 2, SS.Y / 2)
+            local ToObj = (ObjPos - Camera.CFrame.Position).Unit
+            local Dir = Vector2.new(SP.X, SP.Y) - C
+            if Camera.CFrame.LookVector:Dot(ToObj) < 0 then Dir = -Dir end
+            if Dir.Magnitude < 1 then Dir = Vector2.new(0, 1) end
+            local Ang = math.atan2(Dir.Y, Dir.X)
+            local Rad = math.min(SS.X, SS.Y) / 2 - (400 - ESP.ArrowRadius)
+            local AP = C + Dir.Unit * Rad
+            Arrow.Position = UDim2.fromOffset(AP.X, AP.Y)
+            Arrow.Rotation = math.deg(Ang) - 90
+            Arrow.Visible = true
+            Arrow.ImageColor3 = ESP.Rainbow and ESP.RainbowColor or ESP.ColorTable[Object] or Color3.new(1, 1, 1)
+        end
+    end
+end
 
-            if HL then
-                local Distance = math.floor((Camera.CFrame.Position - ObjPos).Magnitude)
-                local DText = ESP.ShowDistance and ("\n<font size='" .. math.round(ESP.TextSize * ESP.DistanceSizeRatio) .. "'>[" .. Distance .. "]</font>") or ""
-                if Label then Label.Text = (ESP.TextTable[Object] or "") .. DText end
-                HL.Enabled = true
-                HL.FillColor = ActiveColor
-                HL.OutlineColor = ESP.MatchColors and ActiveColor or ESP.OutlineColor
-                if ESP.TransparencyEnabled[Object] then
-                    HL.FillTransparency = ESP.FillTransparency
-                    HL.OutlineTransparency = ESP.OutlineTransparency
-                    if Label then
-                        Label.TextTransparency = ESP.TextTransparency
-                        Label.TextStrokeTransparency = ESP.TextOutlineTransparency
+local LastStep = 0
+ESP.MainConnection = RunService.Heartbeat:Connect(function(Dt)
+    if ESP.Unloaded then return end
+    LastStep = LastStep + Dt
+    if LastStep < 1 / ESP.RenderLimit then return end
+    LastStep = 0
+    local Camera = Workspace.CurrentCamera
+    if not Camera then return end
+    local CamPos = Camera.CFrame.Position
+    table.clear(Candidates)
+    local Snapshot = table.clone(ESP.TotalObjects)
+    for _, Object in ipairs(Snapshot) do
+        if ESP.ElementsEnabled[Object] then
+            local Meta = ESP.Meta[Object]
+            if not Object.Parent or not Object:IsDescendantOf(Workspace) then
+                ESP:RemoveESP(Object)
+            elseif Meta then
+                local Ok, Pivot = pcall(Object.GetPivot, Object)
+                if Ok then
+                    local ObjPos = Pivot.Position
+                    local SP, OnScreen = Camera:WorldToViewportPoint(ObjPos)
+                    Meta.Pos = ObjPos
+                    Meta.SP = SP
+                    Meta.OnScreen = OnScreen
+                    Meta.Dist = math.floor((CamPos - ObjPos).Magnitude)
+                    if OnScreen then
+                        table.insert(Candidates, { Object = Object, Priority = Meta.Priority, Dist = Meta.Dist })
                     end
-                end
-            end
-
-            if Line and ESP.Tracers and not NoTracer and ((HL and OnScreen) or AlwaysTracer) then
-                local SS = Camera.ViewportSize
-                local Origin
-                if ESP.TracerOrigin == "Center" then
-                    Origin = Vector2.new(SS.X / 2, SS.Y / 2)
-                elseif ESP.TracerOrigin == "Top" then
-                    Origin = Vector2.new(SS.X / 2, 0)
-                elseif ESP.TracerOrigin == "Mouse" then
-                    local M = UserInputService:GetMouseLocation()
-                    Origin = Vector2.new(M.X, M.Y)
                 else
-                    Origin = Vector2.new(SS.X / 2, SS.Y)
-                end
-                local Dest = Vector2.new(SP.X, SP.Y)
-                if AlwaysTracer then
-                    -- ngoài màn hình / sau lưng: kẹp đầu đường vào mép màn hình để chỉ hướng
-                    local Center = Vector2.new(SS.X / 2, SS.Y / 2)
-                    local Dir = Dest - Center
-                    if SP.Z < 0 then Dir = -Dir end
-                    if Dir.Magnitude < 1 then Dir = Vector2.new(0, 1) end
-                    local SX = Dir.X ~= 0 and (Center.X - 24) / math.abs(Dir.X) or math.huge
-                    local SY = Dir.Y ~= 0 and (Center.Y - 24) / math.abs(Dir.Y) or math.huge
-                    local Scale = math.min(SX, SY)
-                    if SP.Z >= 0 then Scale = math.min(Scale, 1) end
-                    Dest = Center + Dir * Scale
-                end
-                local Mid = (Origin + Dest) / 2
-                local Rot = math.deg(math.atan2(Dest.Y - Origin.Y, Dest.X - Origin.X))
-                local Len = (Origin - Dest).Magnitude
-                Line[1].Position = UDim2.fromOffset(Mid.X, Mid.Y)
-                Line[1].Size = UDim2.fromOffset(Len, 1)
-                Line[1].Rotation = Rot
-                Line[1].BackgroundColor3 = ActiveColor
-                Line[1].BorderSizePixel = 0
-                Line[1].Visible = true
-                Line[2].Color = ActiveColor
-                Line[2].Thickness = ESP.TracerSize
-            end
-
-            if ESP.Arrows then
-                local Arrow = ESP.ArrowsTable[Object]
-                if not Arrow and ESP.ElementsEnabled[Object] then
-                    Arrow = ArrowTemplate:Clone()
-                    Arrow.Parent = ArrowsFrame
-                    ESP.ArrowsTable[Object] = Arrow
-                    PlayTween(Arrow, { ImageTransparency = 0 })
-                elseif Arrow and ESP.ElementsEnabled[Object] then
-                    if OnScreen and SP.Z > 0 then
-                        Arrow.Visible = false
-                    else
-                        local SS = Camera.ViewportSize
-                        local C = Vector2.new(SS.X / 2, SS.Y / 2)
-                        local ToObj = (ObjPos - Camera.CFrame.Position).Unit
-                        local Dir = Vector2.new(SP.X, SP.Y) - C
-                        if Camera.CFrame.LookVector:Dot(ToObj) < 0 then Dir = -Dir end
-                        local Ang = math.atan2(Dir.Y, Dir.X)
-                        local Rad = math.min(SS.X, SS.Y) / 2 - (400 - ESP.ArrowRadius)
-                        local AP = C + Dir.Unit * Rad
-                        Arrow.Position = UDim2.fromOffset(AP.X, AP.Y)
-                        Arrow.Rotation = math.deg(Ang) - 90
-                        Arrow.Visible = true
-                        Arrow.ImageColor3 = ESP.Rainbow and ESP.RainbowColor or ESP.ColorTable[Object]
-                    end
+                    Meta.OnScreen = false
+                    Meta.Pos = Meta.Pos or CamPos
+                    Meta.SP = Meta.SP or Vector3.zero
+                    Meta.Dist = Meta.Dist or 0
                 end
             end
         end
-
-        local Conn
-        Conn = RunService.Heartbeat:Connect(function(Dt)
-            Last = Last + Dt
-            if Last >= 1 / ESP.RenderLimit then
-                Last = 0
-                if not ESP.ElementsEnabled[Object] then Conn:Disconnect(); return end
-                Render()
-            end
-        end)
-        table.insert(ESP.ConnectionsTable[Object], Conn)
-    end)
-end
+    end
+    table.sort(Candidates, ByPriority)
+    local Allowed = {}
+    for I = 1, math.min(#Candidates, HighlightBudget) do
+        Allowed[Candidates[I].Object] = true
+    end
+    for _, Object in ipairs(Snapshot) do
+        if ESP.ElementsEnabled[Object] and ESP.Meta[Object] and ESP.Meta[Object].SP then
+            UpdateObject(Object, Camera, Allowed)
+        end
+    end
+end)
 
 function ESP:RemoveESP(Object)
     if ESP.Unloaded or not ESP.ElementsEnabled[Object] then return end
@@ -369,6 +412,7 @@ function ESP:Unload()
     local objs = {}
     for O in pairs(ESP.Objects) do table.insert(objs, O) end
     for _, O in ipairs(objs) do DestroyObjectData(O) end
+    if ESP.MainConnection then ESP.MainConnection:Disconnect() end
     if RainbowConnection then RainbowConnection:Disconnect() end
     if EntityAlertConnection then EntityAlertConnection:Disconnect() end
     ScreenGui.Enabled = false
